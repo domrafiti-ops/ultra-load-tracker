@@ -4,26 +4,236 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Load Log — Two-Channel Ultra Load Tracker</title>
-<meta name="description" content="Log a mountain run from five watch numbers, get aerobic and eccentric load, keep the history in JSONBin, export to CSV.">
+<meta name="description" content="Log a mountain run from five watch numbers and get aerobic and eccentric load. Metric or imperial, synced to JSONBin, CSV export.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/styles.css">
 <style>
-  /* page-specific: sync panel, storage meter, edit state */
-  .szmeter{height:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:3px; overflow:hidden; margin:9px 0 7px}
+/* ---- design tokens and components ---- */
+/* Two-Channel Ultra Load Tracker — shared design tokens and components.
+   Palette: cool mineral neutrals, teal = aerobic channel, oxblood = mechanical. */
+
+:root{
+  --bg:#EDF0EE; --surface:#FAFBFA; --surface-2:#E4E9E6;
+  --ink:#15201E; --ink-2:#3A4643; --muted:#5E6A66; --line:#CFD7D3; --line-2:#B9C4BF;
+  --aero:#0E6E6B; --aero-soft:#D9EAE8; --aero-ink:#084F4D;
+  --mech:#8C3B4A; --mech-soft:#F2DFE2; --mech-ink:#66242F;
+  --flag:#8A5A08; --flag-soft:#F5E7CE;
+  --ok:#1D6F42; --bad:#9B2C2C;
+  --maxw:1040px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1413; --surface:#161E1C; --surface-2:#1E2725;
+    --ink:#E4EBE8; --ink-2:#C2CDC9; --muted:#8E9A96; --line:#28312F; --line-2:#3A4542;
+    --aero:#4CBDB6; --aero-soft:#12302E; --aero-ink:#8AD9D3;
+    --mech:#E0808F; --mech-soft:#331A20; --mech-ink:#F0AEB8;
+    --flag:#D9A852; --flag-soft:#2E2513;
+    --ok:#6FCF97; --bad:#F09B9B;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1413; --surface:#161E1C; --surface-2:#1E2725;
+  --ink:#E4EBE8; --ink-2:#C2CDC9; --muted:#8E9A96; --line:#28312F; --line-2:#3A4542;
+  --aero:#4CBDB6; --aero-soft:#12302E; --aero-ink:#8AD9D3;
+  --mech:#E0808F; --mech-soft:#331A20; --mech-ink:#F0AEB8;
+  --flag:#D9A852; --flag-soft:#2E2513;
+  --ok:#6FCF97; --bad:#F09B9B;
+}
+
+*{box-sizing:border-box}
+html{color-scheme:light dark}
+body{
+  background:var(--bg); color:var(--ink); margin:0;
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:16.5px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 22px 80px}
+h1,h2,h3,h4,.disp,button,nav a{font-family:Archivo,"Helvetica Neue",Arial,sans-serif; letter-spacing:-.01em}
+h1,h2,h3,h4{text-wrap:balance}
+.mono,code,pre,table.data,table.log,.eq{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+.tnum{font-variant-numeric:tabular-nums}
+a{color:var(--aero); text-decoration:underline; text-underline-offset:2px; text-decoration-thickness:1px}
+a:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--aero); outline-offset:2px}
+
+/* ---- masthead + nav ---- */
+nav.top{display:flex; gap:20px; align-items:center; padding:14px 0; border-bottom:1px solid var(--line); flex-wrap:wrap}
+nav.top a{font-size:13px; font-weight:600; text-decoration:none; color:var(--muted); letter-spacing:.02em}
+nav.top a:hover{color:var(--ink)}
+nav.top a[aria-current="page"]{color:var(--aero)}
+nav.top .sp{flex:1}
+header.mast{padding:36px 0 22px; border-bottom:1px solid var(--line); margin-bottom:30px}
+.kicker{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+h1{font-size:clamp(28px,4.8vw,42px); line-height:1.07; font-weight:700; margin:11px 0 12px}
+.standfirst{font-size:17.5px; color:var(--ink-2); max-width:64ch; margin:0}
+.meta{margin-top:18px; display:flex; flex-wrap:wrap; gap:8px 10px}
+.tag{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+  border:1px solid var(--line-2); color:var(--muted); padding:4px 9px; border-radius:2px}
+
+section{margin-top:48px}
+h2{font-size:12.5px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted);
+  margin:0 0 18px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+h3{font-size:19.5px; font-weight:600; margin:26px 0 9px}
+h4{font-size:14.5px; font-weight:600; margin:19px 0 5px; letter-spacing:0}
+p{margin:0 0 13px; max-width:68ch}
+.lede{font-size:17px; color:var(--ink-2)}
+
+/* ---- panels + forms ---- */
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:20px}
+.f label{display:block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:4px}
+.f .sublab{text-transform:none; letter-spacing:0; font-size:10px; opacity:.8}
+input,select,textarea{width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line-2);
+  border-radius:2px; padding:7px 9px; font-family:"IBM Plex Mono",monospace; font-size:14.5px}
+input[type=date]{font-size:13.5px}
+input.serif{font-family:"Source Serif 4",Georgia,serif}
+.gridauto{display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:12px}
+.corefields{display:grid; grid-template-columns:1.5fr repeat(5,1fr); gap:12px}
+@media(max-width:880px){.corefields{grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}}
+.subsection{margin-top:16px; padding-top:15px; border-top:1px dashed var(--line-2)}
+.subsection .hdr{display:flex; align-items:baseline; gap:10px; margin-bottom:11px; flex-wrap:wrap}
+.subsection .hdr .disp{font-size:14px; font-weight:600}
+.subsection .hdr span{font-size:13px; color:var(--muted)}
+
+/* ---- readouts ---- */
+.readout{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px; margin-top:20px;
+  background:var(--line); border:1px solid var(--line); border-radius:3px; overflow:hidden}
+.ro{background:var(--surface-2); padding:13px 15px}
+.ro .k{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+.ro .v{font-family:Archivo,sans-serif; font-size:30px; font-weight:700; line-height:1.12; margin-top:4px; font-variant-numeric:tabular-nums}
+.ro .u{font-size:12px; color:var(--muted); font-family:"IBM Plex Mono",monospace}
+.ro.a .v{color:var(--aero)} .ro.m .v{color:var(--mech)}
+
+/* ---- buttons ---- */
+.btnrow{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; align-items:center}
+button{font-family:Archivo,sans-serif; font-size:13.5px; font-weight:600; background:var(--surface-2); color:var(--ink);
+  border:1px solid var(--line-2); border-radius:2px; padding:9px 16px; cursor:pointer}
+button:hover{border-color:var(--ink-2)}
+button.primary{background:var(--aero); border-color:var(--aero); color:#FAFBFA}
+button.primary:hover{filter:brightness(1.09)}
+button.small{padding:6px 11px; font-size:12.5px}
+.savenote{font-size:13px; color:var(--muted)}
+.savenote.ok{color:var(--ok)} .savenote.bad{color:var(--bad)}
+
+/* ---- tables ---- */
+.tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:3px; background:var(--surface)}
+table.log,table.data{width:100%; border-collapse:collapse; font-size:13.5px}
+table.log{min-width:760px} table.data{min-width:660px}
+table.log th,table.data th{background:var(--surface-2); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; text-align:right; padding:9px 11px; border-bottom:1px solid var(--line); white-space:nowrap}
+table.log td,table.data td{padding:9px 11px; border-bottom:1px solid var(--line); text-align:right;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+table.log th:nth-child(-n+2),table.log td:nth-child(-n+2),
+table.data th:first-child,table.data td:first-child{text-align:left}
+table.log tbody tr:last-child td,table.data tbody tr:last-child td{border-bottom:none}
+table.log td.ae,table.data td.ae{color:var(--aero); font-weight:600}
+table.log td.me,table.data td.me{color:var(--mech); font-weight:600}
+table.log td.lbl{font-family:"Source Serif 4",Georgia,serif; white-space:normal; min-width:150px}
+table.data input{padding:4px 6px; font-size:13px; text-align:right; min-width:62px}
+table.data input.name{text-align:left; min-width:130px}
+.del{background:none; border:none; color:var(--muted); cursor:pointer; padding:2px 7px; font-size:16px; line-height:1}
+.del:hover{color:var(--mech)}
+.empty{padding:30px 20px; text-align:center; color:var(--muted); font-size:14.5px}
+.dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; vertical-align:1px}
+.dot.synced{background:var(--ok)} .dot.pending{background:var(--flag)} .dot.local{background:var(--line-2)}
+
+.t2{width:100%; border-collapse:collapse; font-size:14.5px; margin-top:4px}
+.t2 th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--muted); font-weight:600; padding:8px 12px 8px 0; border-bottom:1px solid var(--line-2)}
+.t2 td{padding:10px 12px 10px 0; border-bottom:1px solid var(--line); vertical-align:top}
+.t2 td:first-child{font-family:"IBM Plex Mono",monospace; font-size:13.5px; white-space:nowrap}
+.t2 .num{font-variant-numeric:tabular-nums; white-space:nowrap}
+
+/* ---- rolling cards ---- */
+.rolling{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-top:18px}
+.rcard{background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:14px 16px; border-left:3px solid var(--c,var(--line-2))}
+.rcard.a{--c:var(--aero)} .rcard.m{--c:var(--mech)}
+.rcard .k{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+.rcard .v{font-family:Archivo,sans-serif; font-size:25px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums}
+.rcard .n{font-size:12.5px; color:var(--muted)}
+
+/* ---- charts ---- */
+.chartbox{background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:16px 14px 8px; overflow-x:auto}
+.legend{display:flex; gap:18px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted); margin-top:4px}
+.legend i{display:inline-block; width:14px; height:10px; vertical-align:-1px; margin-right:6px; border-radius:1px}
+
+/* ---- equations + callouts ---- */
+.eq{background:var(--surface-2); border:1px solid var(--line); border-radius:3px; padding:13px 16px;
+  font-size:14.5px; line-height:1.95; overflow-x:auto}
+.eq.nowrap{white-space:nowrap}
+sub{font-size:.72em} sup{font-size:.72em}
+.where{font-size:14px; color:var(--ink-2); margin-top:13px}
+.where dl{display:grid; grid-template-columns:auto 1fr; gap:5px 14px; margin:8px 0 0}
+.where dt{font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--ink); white-space:nowrap}
+.where dd{margin:0; color:var(--muted); font-size:14px}
+.callout{border-left:3px solid var(--flag); background:var(--surface); padding:14px 18px; margin:18px 0; border-radius:0 3px 3px 0}
+.callout h4{margin-top:0}
+.callout p:last-child{margin-bottom:0}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:32px}
+@media(max-width:860px){.two{grid-template-columns:1fr}}
+.channels{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+@media(max-width:860px){.channels{grid-template-columns:1fr}}
+.chan{background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:22px; position:relative; overflow:hidden}
+.chan::before{content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--ch)}
+.chan.a{--ch:var(--aero)} .chan.m{--ch:var(--mech)}
+.chan .lbl{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ch); font-weight:600}
+.chan h3{margin:6px 0 4px; font-size:21px}
+.chan .sub{color:var(--muted); font-size:14.5px; margin:0 0 16px}
+
+.pill{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; padding:3px 7px; border-radius:2px; font-weight:600; white-space:nowrap}
+.pill.ev{background:var(--aero-soft); color:var(--aero-ink)}
+.pill.der{background:var(--surface-2); color:var(--ink-2); border:1px solid var(--line-2)}
+.pill.as{background:var(--flag-soft); color:var(--flag)}
+
+ol.refs{font-size:14.5px; padding-left:22px; color:var(--ink-2)}
+ol.refs li{margin-bottom:9px}
+footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font-size:13.5px; color:var(--muted)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+
+/* ---- page-specific ---- */
+.szmeter{height:6px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:3px; overflow:hidden; margin:9px 0 7px}
   .szmeter div{height:100%; background:var(--aero); width:0}
   tr.editing td{background:var(--aero-soft)}
   .del.ed{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em}
   .del.ed:hover{color:var(--aero)}
   .banner{background:var(--aero-soft); border-left:3px solid var(--aero); padding:10px 14px;
     border-radius:0 3px 3px 0; font-size:14px; margin-bottom:14px}
+  .banner.warn{background:var(--flag-soft); border-left-color:var(--flag)}
   .keyrow{display:grid; grid-template-columns:1fr 1.4fr; gap:12px}
   @media(max-width:700px){.keyrow{grid-template-columns:1fr}}
+  .unitpick{display:flex; gap:2px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:3px; padding:2px; width:fit-content}
+  .unitpick button{background:transparent; border:none; padding:6px 14px; font-size:12.5px; border-radius:2px}
+  .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
+  .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
+  .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
 </style>
 </head>
 <body>
+<!--
+  ══════════════════════════════════════════════════════════════════════════
+  TWO-CHANNEL ULTRA LOAD TRACKER
+  Single self-contained file. No build step, no dependencies, no CDN except
+  the web font. Works from a double-click or from GitHub Pages.
+
+  To deploy: drop this file in and you are done.
+  To develop: the three <script id="mod-*"> blocks below are the source of
+  truth, and tests/run.js extracts and exercises those exact blocks — so the
+  217 assertions test the code you actually ship, not a parallel copy.
+
+  Layout of this file:
+    1. <style>              design tokens, both themes
+    2. <body>               markup
+    3. mod-load-model       the physics. Pure, metric, no DOM.
+    4. mod-units            metric/imperial. Display boundary ONLY.
+    5. mod-store            schema, merge, size budget, CSV, JSONBin I/O
+    6. app                  the UI
+  ══════════════════════════════════════════════════════════════════════════
+-->
+
 <div class="wrap">
 
 <nav class="top">
@@ -31,31 +241,33 @@
   <a href="model.html">The Model</a>
   <a href="tests/index.html">Tests</a>
   <span class="sp"></span>
-  <a href="docs/JSONBIN-SETUP.md">Sync setup</a>
+  <a href="tools/jsonbin-doctor.html">Sync doctor</a>
+  <a href="docs/JSONBIN-SETUP.md">Setup</a>
 </nav>
 
 <header class="mast">
   <div class="kicker">Two-channel ultra load tracker · daily instrument</div>
   <h1>Load Log</h1>
-  <p class="standfirst">Enter five numbers after a run — duration, average heart rate, distance, ascent, descent — and get both load values. History lives in your JSONBin bin, so every device sees the same log, and exports to CSV whenever you want it elsewhere.</p>
+  <p class="standfirst">Enter five numbers after a run — duration, average heart rate, distance, ascent, descent — and get both load values. History syncs to your JSONBin bin so every device sees the same log, and exports to CSV whenever you want it elsewhere.</p>
   <div class="meta">
-    <span class="tag" id="syncTag">Sync: local only</span>
+    <span class="tag" id="syncTag"><span class="dot off"></span>Sync: local only</span>
     <span class="tag">Stores inputs, derives outputs</span>
-    <span class="tag">CSV + JSON export</span>
+    <span class="tag" id="unitTag">Metric</span>
   </div>
 </header>
 
 <section id="entry" style="margin-top:0">
   <h2>Log a session</h2>
   <div class="panel">
-    <div class="banner" id="editBanner" hidden>Editing an existing session — the same row will be updated, not duplicated.</div>
+    <div class="banner" id="editBanner" hidden></div>
+    <div class="banner warn" id="warnBanner" hidden></div>
     <div class="corefields">
       <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
       <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" value="120" step="1" min="1"></div>
       <div class="f"><label for="hr">Avg HR <span class="sublab">bpm</span></label><input id="hr" type="number" value="145" step="1" min="1"></div>
-      <div class="f"><label for="dist">Distance <span class="sublab">km</span></label><input id="dist" type="number" value="16" step="0.1" min="0"></div>
-      <div class="f"><label for="up">Ascent <span class="sublab">m D+</span></label><input id="up" type="number" value="900" step="10" min="0"></div>
-      <div class="f"><label for="down">Descent <span class="sublab">m D−</span></label><input id="down" type="number" value="900" step="10" min="0"></div>
+      <div class="f"><label for="dist">Distance <span class="sublab" id="uDist">km</span></label><input id="dist" type="number" value="16" step="0.1" min="0"></div>
+      <div class="f"><label for="up">Ascent <span class="sublab" id="uUp">m</span></label><input id="up" type="number" value="900" step="10" min="0"></div>
+      <div class="f"><label for="down">Descent <span class="sublab" id="uDown">m</span></label><input id="down" type="number" value="900" step="10" min="0"></div>
     </div>
     <div class="f" style="margin-top:12px"><label for="label">Session label</label><input id="label" type="text" class="serif" placeholder="Morning trail loop"></div>
 
@@ -68,7 +280,7 @@
         <div class="f"><label for="dmin">Descent time <span class="sublab">min</span></label><input id="dmin" type="number" placeholder="—" step="1" min="0"></div>
         <div class="f"><label for="umin">Climb time <span class="sublab">min</span></label><input id="umin" type="number" placeholder="—" step="1" min="0"></div>
         <div class="f"><label for="cad">Descent cadence <span class="sublab">spm</span></label><input id="cad" type="number" placeholder="176" step="1" min="0"></div>
-        <div class="f"><label for="pack">Pack <span class="sublab">kg</span></label><input id="pack" type="number" value="0" step="0.5" min="0"></div>
+        <div class="f"><label for="pack">Pack <span class="sublab" id="uPack">kg</span></label><input id="pack" type="number" value="0" step="0.5" min="0"></div>
         <div class="f"><label for="rpe">RPE <span class="sublab">0–10</span></label><input id="rpe" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
         <div class="f"><label for="sore">Quad soreness <span class="sublab">next day, 0–10</span></label><input id="sore" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
       </div>
@@ -76,7 +288,7 @@
 
     <div class="readout">
       <div class="ro a"><div class="k">Aerobic load</div><div class="v tnum" id="oAeL">—</div><div class="u">AeL · AU</div></div>
-      <div class="ro m"><div class="k">Eccentric load</div><div class="v tnum" id="oE">—</div><div class="u">Ê · AU</div></div>
+      <div class="ro m"><div class="k">Eccentric load</div><div class="v tnum" id="oE">—</div><div class="u" id="oEu">Ê · AU</div></div>
       <div class="ro m"><div class="k">Cyclic load</div><div class="v tnum" id="oB">—</div><div class="u" id="oBu">B̂ · needs time split</div></div>
       <div class="ro"><div class="k">Mean descent grade</div><div class="v tnum" id="oG">—</div><div class="u">% · derived</div></div>
       <div class="ro"><div class="k">Intensity</div><div class="v tnum" id="oF">—</div><div class="u">% HR reserve</div></div>
@@ -98,7 +310,8 @@
   <div class="tblwrap">
     <table class="log">
       <thead><tr>
-        <th>Date</th><th>Session</th><th>min</th><th>HR</th><th>km</th><th>D+</th><th>D−</th>
+        <th>Date</th><th>Session</th><th>min</th><th>HR</th>
+        <th id="thDist">km</th><th id="thUp">D+ m</th><th id="thDown">D− m</th>
         <th>AeL</th><th>Ê</th><th>B̂</th><th>RPE</th><th>Sore</th><th></th><th></th>
       </tr></thead>
       <tbody id="logBody"></tbody>
@@ -121,7 +334,8 @@
   <div class="tblwrap">
     <table class="log">
       <thead><tr>
-        <th>Week of</th><th>Sessions</th><th>Hours</th><th>km</th><th>D+</th><th>D−</th>
+        <th>Week of</th><th>Sessions</th><th>Hours</th>
+        <th id="thwDist">km</th><th id="thwUp">D+ m</th><th id="thwDown">D− m</th>
         <th>AeL</th><th>Ê</th><th>Divergence</th><th>Mean RPE</th><th>Mean sore</th>
       </tr></thead>
       <tbody id="weekBody"></tbody>
@@ -140,23 +354,33 @@
   <div class="callout">
     <h4>How to read these</h4>
     <p>A strong positive correlation for <b>Ê vs soreness</b> means the eccentric channel is tracking your actual tissue response. A weak one points at <code>k<sub>m</sub></code> or your descent step length, not at the descent metres — those are measured, the other two are assumed. Adjust one at a time below and watch the correlation move; because nothing derived is stored, the entire history re-prices instantly.</p>
-    <p><b>AeL vs RPE</b> should be strong for continuous sessions. If it is weak specifically on interval days, that is expected and quantified: average heart rate under-counts a session with high intensity spread by roughly 1.843·σ²<sub>F</sub>, about 7&nbsp;% at σ<sub>F</sub>&nbsp;=&nbsp;0.20. Log intervals and the rest of the run as two entries.</p>
+    <p>Rule of thumb at your current settings: <b><span id="ruleOfThumb">—</span></b>. Enough to price a route off its elevation profile before you leave the house.</p>
   </div>
 </section>
 
 <section id="profile">
-  <h2>Profile</h2>
+  <h2>Profile &amp; units</h2>
   <div class="panel">
-    <div class="gridauto">
-      <div class="f"><label for="mBody">Body mass <span class="sublab">kg</span></label><input id="mBody" type="number" value="70" step="0.5" min="20"></div>
+    <div class="subsection" style="margin-top:0; padding-top:0; border-top:none">
+      <div class="hdr">
+        <span class="disp">Units</span>
+        <span>display only — everything is stored metric, so switching never changes a stored value</span>
+      </div>
+      <div class="unitpick" role="group" aria-label="Unit system">
+        <button type="button" id="unitMetric" aria-pressed="true">Metric</button>
+        <button type="button" id="unitImperial" aria-pressed="false">Imperial</button>
+      </div>
+    </div>
+    <div class="gridauto" style="margin-top:16px">
+      <div class="f"><label for="mBody">Body mass <span class="sublab" id="uMass">kg</span></label><input id="mBody" type="number" value="70" step="0.5" min="1"></div>
       <div class="f"><label for="sex">Sex <span class="sublab">TRIMP constants</span></label><select id="sex"><option value="m">male</option><option value="f">female</option></select></div>
       <div class="f"><label for="hrMax">HR max</label><input id="hrMax" type="number" value="188" min="100"></div>
       <div class="f"><label for="hrRest">HR rest</label><input id="hrRest" type="number" value="46" min="25"></div>
-      <div class="f"><label for="sl">Descent step length <span class="sublab">m</span></label><input id="sl" type="number" value="1.05" step="0.05" min="0.4"></div>
+      <div class="f"><label for="sl">Descent step length <span class="sublab" id="uStep">m</span></label><input id="sl" type="number" value="1.05" step="0.05" min="0.1"></div>
       <div class="f"><label for="km">k<sub>m</sub> <span class="sublab">muscle exponent</span></label><input id="km" type="number" value="1.5" step="0.25" min="1" max="2.5"></div>
       <div class="f"><label for="kb">k<sub>b</sub> <span class="sublab">bone exponent</span></label><input id="kb" type="number" value="3" step="0.5" min="1" max="6"></div>
     </div>
-    <p class="savenote" style="margin-top:12px">The profile travels with the log, so a new device picks up your settings on first sync.</p>
+    <p class="savenote" style="margin-top:12px">The profile — including your unit choice — travels with the log, so a new device picks it up on first sync.</p>
   </div>
 </section>
 
@@ -164,13 +388,20 @@
   <h2>Sync &amp; storage</h2>
   <div class="panel">
     <div class="keyrow">
-      <div class="f"><label for="binId">JSONBin Bin ID</label><input id="binId" type="text" placeholder="68b1…"></div>
-      <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="password" placeholder="$2a$10$…" autocomplete="off"></div>
+      <div class="f"><label for="binId">JSONBin Bin ID</label><input id="binId" type="text" placeholder="24 hex characters, or paste the bin URL" autocomplete="off" spellcheck="false"></div>
+      <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="text" placeholder="$2a$10$…" autocomplete="off" spellcheck="false"></div>
     </div>
     <div class="btnrow">
       <button type="button" class="primary" id="syncNow">Sync now</button>
       <button type="button" id="pullNow">Pull from bin</button>
+      <a href="tools/jsonbin-doctor.html" style="font-size:13.5px">Trouble? Run the sync doctor →</a>
       <span class="savenote" id="syncNote"></span>
+    </div>
+
+    <div class="callout">
+      <h4>If the Access Key is being rejected</h4>
+      <p><b>A newly created Access Key has no permissions at all until you grant them</b> — creating the key is not the same as enabling it. In JSONBin go to <b>API Keys</b>, open your key, and tick both <b>Bins Read</b> and <b>Bins Update</b>. The tracker needs both: Read to load the log, Update to save it.</p>
+      <p>If that is already done, open the <a href="tools/jsonbin-doctor.html">sync doctor</a>. It runs the same four calls this page makes and shows the raw HTTP status and JSONBin's exact wording, which distinguishes a permissions problem from a wrong key, a wrong bin, and a blocked request — four things that all surface as "it doesn't work".</p>
     </div>
 
     <div class="subsection">
@@ -182,24 +413,1782 @@
         <div class="f"><label for="archiveDate">Archive sessions before</label><input id="archiveDate" type="date"></div>
         <div class="f" style="display:flex; align-items:flex-end"><button type="button" id="archive">Trim log to this cutoff</button></div>
       </div>
-      <p class="savenote">Download CSV first — archiving is not reversible from inside the app. Bin versioning is enabled on every write, so JSONBin also keeps up to 1000 prior versions you can restore from its dashboard.</p>
+      <p class="savenote">Download CSV first — archiving is not reversible from inside the app. Bin versioning is on for every write, so JSONBin also keeps up to 1000 prior versions you can restore from its dashboard.</p>
     </div>
 
     <div class="callout">
-      <h4>What the Access Key does and does not protect</h4>
-      <p>This is a static site, so the key you paste lives in your browser's local storage and is visible to anyone with your browser or devtools. That is why it must be an <b>Access Key</b> scoped to <b>Bins Read + Bins Update</b> — never your Master Key, which can create and delete every bin on your account. Someone who extracted this key could read or overwrite this one training log. For a personal training log that is an acceptable trade; do not put anything else in the bin. Setup walkthrough: <a href="docs/JSONBIN-SETUP.md">docs/JSONBIN-SETUP.md</a>.</p>
+      <h4>What the Access Key protects, and what it does not</h4>
+      <p>This is a static site, so the key you paste lives in your browser's local storage and is visible to anyone with your browser or devtools. That is why it must be an <b>Access Key</b> scoped to Bins Read + Bins Update — never your Master Key, which can create and delete every bin on your account. Someone who extracted this key could read or overwrite this one training log. For a personal training log that is an acceptable trade; do not put anything else in the bin.</p>
     </div>
   </div>
 </section>
 
 <footer>
-  Model derivation, coefficient provenance and the evidence ledger are in <a href="model.html">The Model</a>. Formulas live in <code>lib/load-model.js</code>, storage in <code>lib/store.js</code>, both asserted in <a href="tests/index.html">tests</a>. Not medical advice — a load model does not replace judgement about pain, injury or illness.
+  Model derivation, coefficient provenance and the evidence ledger are in <a href="model.html">The Model</a>. Formulas, unit conversion and storage live in the three <code>mod-*</code> script blocks inside this file, and <a href="tests/index.html">217 assertions</a> run against those exact blocks. Not medical advice — a load model does not replace judgement about pain, injury or illness.
 </footer>
 
 </div>
 
-<script src="lib/load-model.js"></script>
-<script src="lib/store.js"></script>
-<script src="assets/app.js"></script>
+<script id="mod-load-model">
+/* verbatim module source — see tests/run.js */
+/*!
+ * load-model.js — Two-Channel Ultra Load Model
+ *
+ * Pure functions. No DOM, no globals beyond the export. Runs in the browser
+ * and under Node (for tests).
+ *
+ * Two independent load channels for mountain / ultra running:
+ *   AeL  — aerobic (internal, cardiorespiratory) dose
+ *   Ê/B̂ — mechanical (external, tissue) dose, split into eccentric and cyclic
+ *
+ * Never add AeL and MechL. They are a coordinate pair, not a total.
+ *
+ * Provenance for every coefficient is in docs/ and in model.html.
+ * Coefficients marked ASSUMED below are judgement, not measurement.
+ */
+(function (root, factory) {
+  "use strict";
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.LoadModel = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var G = 9.81;                 // m/s^2
+  var J_PER_ML_O2 = 20.9;       // caloric equivalent at RER ~0.96 (range 19.6-21.1)
+  var VO2_REST = 3.5;           // mL/kg/min
+  var SPEED_EXP = 1.1304;       // DERIVED: ln(1.31)/ln(16.0/12.6), Rice et al. 2024
+  var K_BONE_DEFAULT = 3.0;     // ASSUMED: gentle end of cortical-bone fatigue-life exponents
+  var K_MUSCLE_DEFAULT = 1.5;   // ASSUMED: no published eccentric-damage dose-response exponent
+  var SL_DESCENT_DEFAULT = 1.05;// ASSUMED: typical trail descent step length, m
+
+  // Durability up-weight: threshold intensities migrate down during long efforts.
+  // Slope DERIVED from Hunter 2025 (5.5% / 90 min) and Hamilton 2024 (6% / 150 min).
+  // Onset and cap are ASSUMED.
+  var DUR_ONSET_MIN = 90;
+  var DUR_SLOPE_PER_H = 0.035;
+  var DUR_CAP = 1.30;
+  var DUR_CAP_AT_MIN = DUR_ONSET_MIN + 60 * ((DUR_CAP - 1) / DUR_SLOPE_PER_H); // 604.286
+
+  // ---------------------------------------------------------------------------
+  // Minetti et al. 2002 gradient cost polynomials, J/kg/m, net of resting.
+  // Verified against the paper's own reported extremes to within 1.6-5.9%.
+  // KNOWN FAILURE: costWalk is ~39% high at its -10% minimum. Do not use the
+  // walking polynomial for shallow downhill.
+  // ---------------------------------------------------------------------------
+  function costRun(i) {
+    return 155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 43.3 * Math.pow(i, 3)
+         + 46.3 * i * i + 19.5 * i + 3.6;
+  }
+  function costWalk(i) {
+    return 280.5 * Math.pow(i, 5) - 58.7 * Math.pow(i, 4) - 76.8 * Math.pow(i, 3)
+         + 51.9 * i * i + 19.6 * i + 2.5;
+  }
+  /** gait: "run" | "walk" | "auto" (auto hikes above +20% grade) */
+  function costGrade(i, gait) {
+    if (gait === "walk") return costWalk(i);
+    if (gait === "run") return costRun(i);
+    return i > 0.20 ? costWalk(i) : costRun(i);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calibration references. Both are computed, not hardcoded, so the reference
+  // sessions return exactly 100 AU by construction.
+  // ---------------------------------------------------------------------------
+
+  // Eccentric reference = the canonical muscle-damaging downhill protocol,
+  // characterised by the medians in Bontemps et al. 2020:
+  // -12% grade, 40 min, 11.3 km/h, at 70 kg and 170 spm.
+  var REF_ECC = {
+    massKg: 70, gradeFrac: 0.12, durationMin: 40, speedKmh: 11.3, cadenceSpm: 170
+  };
+  function eccentricReference() {
+    var v = REF_ECC.speedKmh / 3.6;
+    var distanceM = v * REF_ECC.durationMin * 60;
+    var descentM = distanceM * REF_ECC.gradeFrac;
+    var steps = REF_ECC.cadenceSpm * REF_ECC.durationMin;
+    var perStepJ = REF_ECC.massKg * G * descentM / steps;
+    return {
+      distanceM: distanceM, descentM: descentM, steps: steps,
+      stepLengthM: distanceM / steps, perStepJ: perStepJ,
+      raw: steps * Math.pow(perStepJ, K_MUSCLE_DEFAULT)
+    };
+  }
+  var E_REF = eccentricReference().raw;   // ~5.9313e6
+
+  // Cyclic reference = flat 10 km at 12 km/h, 175 spm.
+  var REF_CYC = { distanceM: 10000, speedKmh: 12, cadenceSpm: 175 };
+  var V_REF = REF_CYC.speedKmh / 3.6;     // 3.3333 m/s
+  var B_REF = REF_CYC.cadenceSpm * (REF_CYC.distanceM / V_REF) / 60; // 8750 steps
+
+  // Grade factor for the cyclic channel. ASSUMED magnitudes; the direction is
+  // supported (Vernillo 2017: uphill raises duty factor, cutting peak force).
+  function gradeFactor(gradeFrac) {
+    if (gradeFrac < -0.01) return 1.2;
+    if (gradeFrac > 0.01) return 0.7;
+    return 1.0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // AEROBIC CHANNEL
+  // ---------------------------------------------------------------------------
+
+  /** Banister TRIMP weighting, fitted to the delta-HR / blood-lactate relation. */
+  function trimpWeight(F, male) {
+    var f = Math.max(0, Math.min(F, 1.15));
+    return male ? 0.64 * Math.exp(1.92 * f) : 0.86 * Math.exp(1.67 * f);
+  }
+
+  /** Instantaneous durability weight at elapsed minute t. */
+  function durabilityWeight(t) {
+    return Math.min(1 + DUR_SLOPE_PER_H * Math.max(0, (t - DUR_ONSET_MIN) / 60), DUR_CAP);
+  }
+
+  /** Closed-form integral of durabilityWeight from 0 to T minutes. */
+  function durabilityIntegral(T) {
+    if (T <= DUR_ONSET_MIN) return T;
+    if (T <= DUR_CAP_AT_MIN) {
+      return T + (DUR_SLOPE_PER_H / 120) * Math.pow(T - DUR_ONSET_MIN, 2);
+    }
+    var atCap = DUR_CAP_AT_MIN + (DUR_SLOPE_PER_H / 120) * Math.pow(DUR_CAP_AT_MIN - DUR_ONSET_MIN, 2);
+    return atCap + DUR_CAP * (T - DUR_CAP_AT_MIN);
+  }
+
+  function reserveFractionHR(avgHr, hrRest, hrMax) {
+    var span = Math.max(hrMax - hrRest, 1);
+    return (avgHr - hrRest) / span;
+  }
+
+  /**
+   * Terrain-derived intensity when heart rate is unavailable (Tier B).
+   * Minetti costs are net of resting, so the denominator is VO2 reserve —
+   * which is what licenses feeding it into a weighting fitted to %HRR,
+   * since %VO2R ~= %HRR.
+   */
+  function reserveFractionTerrain(o) {
+    var vo2maxAlt = altitudeAdjustedVO2max(o.vo2max, o.altitudeM || 0);
+    var massRatio = (o.massKg + (o.packKg || 0)) / Math.max(o.massKg, 1);
+    var c = costGrade(o.gradeFrac, o.gait || "auto");
+    var vo2 = 60 * massRatio * c * o.speedMs / J_PER_ML_O2;   // net mL/kg/min
+    return vo2 / Math.max(vo2maxAlt - VO2_REST, 1);
+  }
+
+  /** ASSUMED coefficient: commonly cited ~6.5%/1000 m above 1500 m. Unverified. */
+  function altitudeAdjustedVO2max(vo2max, altitudeM) {
+    return vo2max * (1 - 0.065 * Math.max(0, (altitudeM - 1500) / 1000));
+  }
+
+  /**
+   * Whole-session aerobic load from average heart rate.
+   * Error vs. segment integration is ~1.843 * variance(F) — under 3% for
+   * continuous running, ~7% for sessions containing hard intervals.
+   */
+  function aerobicLoadSimple(s, p) {
+    var F = reserveFractionHR(s.avgHr, p.hrRest, p.hrMax);
+    return {
+      aeL: trimpWeight(F, p.male) * durabilityIntegral(s.durationMin),
+      reserveFraction: F
+    };
+  }
+
+  /** Segment-by-segment aerobic load. Ground truth for the simple form. */
+  function aerobicLoadSegments(segments, p) {
+    var elapsed = 0, total = 0;
+    segments.forEach(function (g) {
+      var mins = g.durationMin != null
+        ? g.durationMin
+        : (g.distanceM / g.speedMs) / 60;
+      var F = g.avgHr != null
+        ? reserveFractionHR(g.avgHr, p.hrRest, p.hrMax)
+        : reserveFractionTerrain({
+            gradeFrac: g.gradeFrac, speedMs: g.speedMs, massKg: p.massKg,
+            packKg: p.packKg, vo2max: p.vo2max, altitudeM: p.altitudeM, gait: g.gait
+          });
+      total += mins * trimpWeight(F, p.male) * durabilityWeight(elapsed + mins / 2);
+      elapsed += mins;
+    });
+    return { aeL: total, movingMin: elapsed };
+  }
+
+  // ---------------------------------------------------------------------------
+  // MECHANICAL CHANNEL — eccentric (Ê)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Segment form. Damage accumulates as cycles x magnitude^k, the same
+   * structure as a bone S-N fatigue curve. Climbs contribute zero.
+   */
+  function eccentricLoadSegments(segments, p) {
+    var km = p.kMuscle != null ? p.kMuscle : K_MUSCLE_DEFAULT;
+    var mTot = p.massKg + (p.packKg || 0);
+    var raw = 0;
+    segments.forEach(function (g) {
+      if (g.gradeFrac >= 0) return;
+      var mins = g.durationMin != null ? g.durationMin : (g.distanceM / g.speedMs) / 60;
+      var steps = g.cadenceSpm * mins;
+      var descentM = g.distanceM * Math.abs(g.gradeFrac);
+      if (steps <= 0 || descentM <= 0) return;
+      var perStepJ = mTot * G * descentM / steps;
+      raw += steps * Math.pow(perStepJ, km);
+    });
+    return { eccentric: 100 * raw / referenceRaw(km), raw: raw };
+  }
+
+  /** E_ref recomputed for a non-default exponent so 100 AU stays anchored. */
+  function referenceRaw(km) {
+    if (Math.abs(km - K_MUSCLE_DEFAULT) < 1e-12) return E_REF;
+    var r = eccentricReference();
+    return r.steps * Math.pow(r.perStepJ, km);
+  }
+
+  /**
+   * Whole-session form. At k = 1.5 the segment sum collapses exactly:
+   *   sum N*(m*g*h/N)^1.5  ->  (m*g)^1.5 * D * sqrt(grade * stepLength)
+   * so descent metres enter LINEARLY and grade/step-length only under a root.
+   * A 20% error in either moves the result by 10%.
+   */
+  function eccentricLoadSimple(s, p) {
+    var km = p.kMuscle != null ? p.kMuscle : K_MUSCLE_DEFAULT;
+    var mTot = p.massKg + (s.packKg || 0);
+    var sl = p.descentStepLengthM || SL_DESCENT_DEFAULT;
+    var out = { eccentric: 0, meanDescentGrade: 0, descentDistanceM: 0 };
+    if (!(s.descentM > 0) || !(s.distanceKm > 0)) return out;
+
+    // Split distance between climbing and descending in proportion to D+ / D-.
+    // On the worked example this recovers 0.160 against a true weighted 0.169.
+    var vert = (s.ascentM || 0) + s.descentM;
+    var dDownM = vert > 0 ? s.distanceKm * 1000 * (s.descentM / vert) : s.distanceKm * 1000;
+    var grade = dDownM > 0 ? s.descentM / dDownM : 0;
+    grade = Math.max(0.005, Math.min(grade, 0.60));
+    out.meanDescentGrade = grade;
+    out.descentDistanceM = dDownM;
+
+    if (Math.abs(km - 1.5) < 1e-12) {
+      out.eccentric = 100 * Math.pow(mTot * G, 1.5) * s.descentM
+                    * Math.sqrt(grade * sl) / E_REF;
+    } else {
+      var steps = dDownM / sl;
+      var perStepJ = mTot * G * s.descentM / Math.max(steps, 1);
+      out.eccentric = 100 * steps * Math.pow(perStepJ, km) / referenceRaw(km);
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // MECHANICAL CHANNEL — cyclic (B̂)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Effective speed exponent is SPEED_EXP * kBone ~= 3.39, so this channel
+   * CANNOT be computed from a session-average speed: averaging a 4 km/h hike
+   * with an 11 km/h descent under-counts by more than half. It needs buckets.
+   *
+   * buckets: [{ distanceM, minutes, gradeFrac }]
+   */
+  function cyclicLoadBuckets(buckets, p) {
+    var kb = p.kBone != null ? p.kBone : K_BONE_DEFAULT;
+    var cad = p.cadenceSpm || 176;
+    var raw = 0, any = false;
+    buckets.forEach(function (b) {
+      if (!(b.distanceM > 0) || !(b.minutes > 0)) return;
+      any = true;
+      var v = b.distanceM / (b.minutes * 60);
+      var steps = cad * b.minutes;
+      raw += steps * Math.pow(Math.pow(v / V_REF, SPEED_EXP) * gradeFactor(b.gradeFrac), kb);
+    });
+    return any ? { cyclic: 100 * raw / B_REF, raw: raw } : { cyclic: null, raw: 0 };
+  }
+
+  /**
+   * Build the three speed buckets from a simple session record.
+   * Returns null when the climb/descent time split is missing — deliberately,
+   * because a fabricated B̂ is worse than no B̂.
+   */
+  function cyclicLoadSimple(s, p) {
+    if (!(s.descentMin > 0) || !(s.climbMin > 0) || !(s.distanceKm > 0)) {
+      return { cyclic: null };
+    }
+    var vert = (s.ascentM || 0) + s.descentM;
+    var totalM = s.distanceKm * 1000;
+    var dDown = vert > 0 ? totalM * (s.descentM / vert) : 0;
+    var dUp = vert > 0 ? totalM * ((s.ascentM || 0) / vert) : 0;
+    var dFlat = Math.max(totalM - dDown - dUp, 0);
+    var flatMin = Math.max(s.durationMin - s.descentMin - s.climbMin, 0);
+    return cyclicLoadBuckets([
+      { distanceM: dDown, minutes: s.descentMin, gradeFrac: -0.15 },
+      { distanceM: dUp,   minutes: s.climbMin,   gradeFrac:  0.15 },
+      { distanceM: dFlat, minutes: flatMin,      gradeFrac:  0 }
+    ], { kBone: p.kBone, cadenceSpm: s.cadenceSpm || p.cadenceSpm });
+  }
+
+  // ---------------------------------------------------------------------------
+  // TOP LEVEL
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Evaluate one logged session.
+   * session: { durationMin, avgHr, distanceKm, ascentM, descentM,
+   *            packKg?, descentMin?, climbMin?, cadenceSpm? }
+   * profile: { massKg, male, hrMax, hrRest, descentStepLengthM?,
+   *            kMuscle?, kBone?, cadenceSpm? }
+   */
+  function evaluateSession(session, profile) {
+    var a = aerobicLoadSimple(session, profile);
+    var e = eccentricLoadSimple(session, profile);
+    var c = cyclicLoadSimple(session, profile);
+    return {
+      aeL: a.aeL,
+      reserveFraction: a.reserveFraction,
+      eccentric: e.eccentric,
+      cyclic: c.cyclic,
+      meanDescentGrade: e.meanDescentGrade,
+      descentDistanceM: e.descentDistanceM
+    };
+  }
+
+  /** Blended mechanical scalar. Convenience only — prefer reporting the pair. */
+  function blendMechanical(eccentric, cyclic, omega, kPole, kSurface) {
+    var w = omega == null ? 0.25 : omega;
+    var b = cyclic == null ? eccentric : cyclic;
+    return ((1 - w) * eccentric + w * b) * (kPole || 1) * (kSurface || 1);
+  }
+
+  /** AU of eccentric load per 100 m of descent, for back-of-envelope route pricing. */
+  function eccentricPer100m(gradeFrac, massKg, stepLengthM) {
+    return eccentricLoadSimple(
+      { descentM: 100, distanceKm: (100 / gradeFrac) / 1000, ascentM: 0, packKg: 0 },
+      { massKg: massKg || 70, descentStepLengthM: stepLengthM || SL_DESCENT_DEFAULT }
+    ).eccentric;
+  }
+
+  return {
+    G: G, E_REF: E_REF, B_REF: B_REF, V_REF: V_REF,
+    SPEED_EXP: SPEED_EXP, DUR_CAP_AT_MIN: DUR_CAP_AT_MIN,
+    REF_ECC: REF_ECC, REF_CYC: REF_CYC,
+    costRun: costRun, costWalk: costWalk, costGrade: costGrade,
+    altitudeAdjustedVO2max: altitudeAdjustedVO2max,
+    trimpWeight: trimpWeight,
+    durabilityWeight: durabilityWeight,
+    durabilityIntegral: durabilityIntegral,
+    reserveFractionHR: reserveFractionHR,
+    reserveFractionTerrain: reserveFractionTerrain,
+    aerobicLoadSimple: aerobicLoadSimple,
+    aerobicLoadSegments: aerobicLoadSegments,
+    eccentricLoadSimple: eccentricLoadSimple,
+    eccentricLoadSegments: eccentricLoadSegments,
+    eccentricReference: eccentricReference,
+    cyclicLoadSimple: cyclicLoadSimple,
+    cyclicLoadBuckets: cyclicLoadBuckets,
+    evaluateSession: evaluateSession,
+    blendMechanical: blendMechanical,
+    eccentricPer100m: eccentricPer100m
+  };
+});
+</script>
+<script id="mod-units">
+/* verbatim module source — see tests/run.js */
+/*!
+ * units.js — metric / imperial display conversion.
+ *
+ * HARD RULE: the model and storage are metric, always.
+ * Every equation in the mod-load-model block is in SI (joules, kg, metres, m/s), and
+ * every value in the bin is metric. Conversion happens only at the display
+ * boundary — reading a form, or writing a label. Nothing downstream of
+ * fromDisplay() ever sees a pound or a foot.
+ *
+ * This is the same discipline as "store inputs, derive outputs": one canonical
+ * representation, converted late. Storing imperial would mean every coefficient
+ * in the model needed a unit-aware twin, and the first rounding error would be
+ * indistinguishable from a physiological result.
+ */
+(function (root, factory) {
+  "use strict";
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.Units = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  // Exact factors. Defined to full precision so round-tripping a value through
+  // the UI does not drift — a user nudging a field should not lose data.
+  var KG_PER_LB = 0.45359237;          // exact by definition
+  var M_PER_FT = 0.3048;               // exact by definition
+  var M_PER_IN = 0.0254;               // exact by definition
+  var KM_PER_MI = 1.609344;            // exact by definition
+
+  var SYSTEMS = ["metric", "imperial"];
+
+  // kind -> { metric: {label, step, decimals}, imperial: {...}, factor }
+  // `factor` converts ONE display-imperial unit into the metric canonical unit.
+  var KINDS = {
+    mass: {
+      factor: KG_PER_LB,
+      metric: { label: "kg", step: 0.5, decimals: 1 },
+      imperial: { label: "lb", step: 1, decimals: 1 }
+    },
+    distance: {
+      factor: KM_PER_MI,
+      metric: { label: "km", step: 0.1, decimals: 2 },
+      imperial: { label: "mi", step: 0.1, decimals: 2 }
+    },
+    elevation: {
+      factor: M_PER_FT,
+      metric: { label: "m", step: 10, decimals: 0 },
+      imperial: { label: "ft", step: 25, decimals: 0 }
+    },
+    steplen: {
+      factor: M_PER_IN,
+      metric: { label: "m", step: 0.05, decimals: 2 },
+      imperial: { label: "in", step: 1, decimals: 1 }
+    }
+  };
+
+  function norm(system) {
+    return SYSTEMS.indexOf(system) >= 0 ? system : "metric";
+  }
+  function spec(kind, system) {
+    var k = KINDS[kind];
+    if (!k) throw new Error("units: unknown kind '" + kind + "'");
+    return k[norm(system)];
+  }
+
+  /** Canonical metric value -> number to show in the field. */
+  function toDisplay(metricValue, kind, system) {
+    if (metricValue === null || metricValue === undefined || metricValue === "") return null;
+    var v = typeof metricValue === "number" ? metricValue : parseFloat(metricValue);
+    if (!isFinite(v)) return null;
+    if (norm(system) === "metric") return round(v, spec(kind, "metric").decimals);
+    return round(v / KINDS[kind].factor, spec(kind, "imperial").decimals);
+  }
+
+  /** Number typed into a field -> canonical metric value. */
+  function fromDisplay(displayValue, kind, system) {
+    if (displayValue === null || displayValue === undefined || displayValue === "") return null;
+    var v = typeof displayValue === "number" ? displayValue : parseFloat(displayValue);
+    if (!isFinite(v)) return null;
+    if (norm(system) === "metric") return v;
+    return v * KINDS[kind].factor;
+  }
+
+  function label(kind, system) { return spec(kind, system).label; }
+  function step(kind, system) { return spec(kind, system).step; }
+  function decimals(kind, system) { return spec(kind, system).decimals; }
+
+  /** Formatted value with its unit, for read-only display. */
+  function format(metricValue, kind, system) {
+    var d = toDisplay(metricValue, kind, system);
+    if (d === null) return "—";
+    return d.toFixed(spec(kind, system).decimals) + " " + label(kind, system);
+  }
+
+  function round(v, d) {
+    var f = Math.pow(10, d);
+    return Math.round(v * f) / f;
+  }
+
+  /**
+   * CSV column name for a unit-bearing field. Column ORDER never changes, so
+   * the formulas in docs/ANALYSIS.md keep working by letter; only the header
+   * text says which unit the file is in. A data file that does not name its
+   * own units is a trap.
+   */
+  function csvColumn(base, kind, system) {
+    return base + "_" + label(kind, system);
+  }
+
+  /**
+   * Rule of thumb for the eccentric channel, restated per display unit.
+   * Metric: AU per 100 m of descent. Imperial: AU per 100 ft.
+   * `perHundredMetres` comes from LoadModel.eccentricPer100m().
+   */
+  function perHundredElevation(perHundredMetres, system) {
+    if (norm(system) === "metric") {
+      return { value: round(perHundredMetres, 1), per: "100 m" };
+    }
+    return { value: round(perHundredMetres * M_PER_FT, 2), per: "100 ft" };
+  }
+
+  return {
+    SYSTEMS: SYSTEMS, KINDS: KINDS,
+    KG_PER_LB: KG_PER_LB, M_PER_FT: M_PER_FT, M_PER_IN: M_PER_IN, KM_PER_MI: KM_PER_MI,
+    normalise: norm,
+    toDisplay: toDisplay, fromDisplay: fromDisplay,
+    label: label, step: step, decimals: decimals, format: format,
+    csvColumn: csvColumn, perHundredElevation: perHundredElevation
+  };
+});
+</script>
+<script id="mod-store">
+/* verbatim module source — see tests/run.js */
+/*!
+ * store.js — persistence for the Two-Channel Ultra Load Tracker.
+ *
+ * JSONBin.io is the source of truth; localStorage is an offline cache and
+ * write queue. Pure logic (schema, merge, size, CSV) is separated from I/O so
+ * it can be tested under Node without network.
+ *
+ * DESIGN DECISION 1 — store inputs, never derived values.
+ * Only what you measured goes in the bin. AeL, Ê and B̂ are recomputed from
+ * the mod-load-model block every time they are displayed or exported, so re-fitting
+ * k_muscle retroactively corrects the entire history instead of leaving stale
+ * numbers frozen in storage.
+ *
+ * DESIGN DECISION 2 — a compact wire format.
+ * JSONBin's free tier rejects any bin over 100 KB. Verbose keys cost ~294
+ * bytes per session (~350 sessions of room); short keys plus epoch-second
+ * timestamps cost ~190 bytes, giving room for ~540 — a little over two years at
+ * five sessions a week. The app always works with readable field names;
+ * packing happens only at the storage boundary, and SESSION_MAP below is the
+ * single definition of the format.
+ *
+ * DESIGN DECISION 3 — metric on the wire, always.
+ * The unit toggle is a display preference (stored in the profile so it follows
+ * you between devices). Every stored value is metric. See the mod-units block.
+ *
+ * VERIFIED API FACTS (jsonbin.io docs, fetched 2026-09-11):
+ *   root            https://api.jsonbin.io/v3
+ *   read            GET  /b/<BIN_ID>/latest
+ *   update          PUT  /b/<BIN_ID>        (Content-Type: application/json)
+ *   auth            X-Access-Key  — needs Bins Read AND Bins Update granted
+ *                   explicitly; a new Access Key has NO permissions by default
+ *   versioning      X-Bin-Versioning: true  — up to 1000 versions retained
+ *   response shape  { record: {...}, metadata: {...} }
+ *   CORS            enabled on all endpoints
+ *   free-tier cap   records over 100 KB are rejected on write
+ */
+(function (root, factory) {
+  "use strict";
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.Store = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var SCHEMA = 3;                       // 3 adds profile.units
+  var LS_KEY = "ultra-load-tracker.v3";
+  var API_ROOT = "https://api.jsonbin.io/v3";
+  var SIZE_LIMIT = 100 * 1024;
+  var SIZE_WARN = 0.80;
+
+  // ---- wire format ---------------------------------------------------------
+  var SESSION_MAP = {
+    id: "i", date: "d", label: "n", durationMin: "t", avgHr: "h",
+    distanceKm: "k", ascentM: "u", descentM: "w", packKg: "p",
+    descentMin: "dm", climbMin: "cm", cadenceSpm: "c",
+    rpe: "r", soreness: "s", editedAt: "e", deletedAt: "x"
+  };
+  var PROFILE_MAP = {
+    massKg: "m", male: "g", hrMax: "hx", hrRest: "hn",
+    descentStepLengthM: "sl", kMuscle: "km", kBone: "kb", units: "un"
+  };
+  var TIME_FIELDS = ["editedAt", "deletedAt"];
+
+  var SESSION_FIELDS = Object.keys(SESSION_MAP);
+  var PROFILE_FIELDS = Object.keys(PROFILE_MAP);
+
+  var DEFAULT_PROFILE = {
+    massKg: 70, male: true, hrMax: 188, hrRest: 46,
+    descentStepLengthM: 1.05, kMuscle: 1.5, kBone: 3.0, units: "metric"
+  };
+
+  function invert(map) {
+    var out = {};
+    Object.keys(map).forEach(function (k) { out[map[k]] = k; });
+    return out;
+  }
+  var SESSION_UNMAP = invert(SESSION_MAP);
+  var PROFILE_UNMAP = invert(PROFILE_MAP);
+
+  // ---------------------------------------------------------------- schema ---
+
+  function now() { return Math.floor(Date.now() / 1000); }
+  function emptyDoc() {
+    return { schema: SCHEMA, rev: 0, updatedAt: now(), profile: {}, sessions: [] };
+  }
+  function keep(v) { return v !== undefined && v !== null && v !== ""; }
+
+  function toEpoch(v) {
+    if (!keep(v)) return undefined;
+    if (typeof v === "number") return Math.floor(v > 1e11 ? v / 1000 : v);
+    var t = Date.parse(v);
+    return isNaN(t) ? undefined : Math.floor(t / 1000);
+  }
+  function toISO(sec) {
+    return typeof sec === "number" && isFinite(sec)
+      ? new Date(sec * 1000).toISOString() : "";
+  }
+
+  /** Canonical in-memory form: verbose keys, numeric timestamps. Idempotent. */
+  function normalise(doc) {
+    var d = doc && typeof doc === "object" && !Array.isArray(doc) ? doc : {};
+    return {
+      schema: SCHEMA,
+      rev: typeof d.rev === "number" ? d.rev : 0,
+      updatedAt: toEpoch(d.updatedAt) || now(),
+      profile: readFields(d.profile, PROFILE_FIELDS, PROFILE_UNMAP),
+      sessions: (Array.isArray(d.sessions) ? d.sessions : [])
+        .map(function (s) { return readFields(s, SESSION_FIELDS, SESSION_UNMAP); })
+        .filter(function (s) { return !!s.id; })
+    };
+  }
+
+  /** Reads a record using either verbose or short keys. */
+  function readFields(src, fields, unmap) {
+    var s = src && typeof src === "object" ? src : {};
+    var out = {};
+    Object.keys(s).forEach(function (k) {
+      var name = unmap[k] !== undefined ? unmap[k] : k;
+      if (fields.indexOf(name) >= 0 && keep(s[k])) out[name] = s[k];
+    });
+    TIME_FIELDS.forEach(function (t) {
+      if (out[t] !== undefined) {
+        var e = toEpoch(out[t]);
+        if (e === undefined) delete out[t]; else out[t] = e;
+      }
+    });
+    return out;
+  }
+
+  /** Profile with defaults filled in. */
+  function profileOf(doc) {
+    var p = {}, stored = (doc && doc.profile) || {};
+    Object.keys(DEFAULT_PROFILE).forEach(function (k) {
+      p[k] = keep(stored[k]) ? stored[k] : DEFAULT_PROFILE[k];
+    });
+    p.male = !!p.male;
+    if (p.units !== "imperial") p.units = "metric";
+    return p;
+  }
+
+  function pack(doc) {
+    var d = normalise(doc);
+    return {
+      v: SCHEMA, rev: d.rev, ts: d.updatedAt,
+      profile: mapKeys(d.profile, PROFILE_MAP),
+      sessions: d.sessions.map(function (s) { return mapKeys(s, SESSION_MAP); })
+    };
+  }
+  function mapKeys(obj, map) {
+    var out = {};
+    Object.keys(map).forEach(function (k) { if (keep(obj[k])) out[map[k]] = obj[k]; });
+    return out;
+  }
+  function unpack(wire) {
+    var w = wire && typeof wire === "object" ? wire : {};
+    return normalise({
+      rev: w.rev,
+      updatedAt: w.ts !== undefined ? w.ts : w.updatedAt,
+      profile: w.profile, sessions: w.sessions
+    });
+  }
+
+  function newId() {
+    return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  }
+
+  function liveSessions(doc) {
+    return (doc.sessions || [])
+      .filter(function (s) { return !s.deletedAt; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  }
+
+  // ----------------------------------------------------------------- merge ---
+
+  /**
+   * Merge two documents. The bin holds one whole document, so without this a
+   * save from a phone would clobber a laptop's edits.
+   *   - sessions unioned by id; newer editedAt wins (numeric compare)
+   *   - deletes are tombstones, so a delete is not resurrected by a stale device
+   *   - profile from whichever document has the higher rev
+   *   - order-independent
+   */
+  function mergeDocs(a, b) {
+    var A = normalise(a), B = normalise(b);
+    var byId = {};
+    function absorb(list) {
+      list.forEach(function (s) {
+        var prev = byId[s.id];
+        if (!prev) { byId[s.id] = s; return; }
+        if ((s.editedAt || 0) > (prev.editedAt || 0)) byId[s.id] = s;
+      });
+    }
+    absorb(A.sessions);
+    absorb(B.sessions);
+    var winner = B.rev > A.rev ? B : A;
+    return {
+      schema: SCHEMA,
+      rev: Math.max(A.rev, B.rev) + 1,
+      updatedAt: now(),
+      profile: Object.keys(winner.profile).length ? winner.profile
+             : (Object.keys(A.profile).length ? A.profile : B.profile),
+      sessions: Object.keys(byId).map(function (k) { return byId[k]; })
+    };
+  }
+
+  // ------------------------------------------------------------------ size ---
+
+  function serialise(doc) { return JSON.stringify(pack(doc)); }
+  function byteLength(str) {
+    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str).length;
+    return Buffer.byteLength(str, "utf8");
+  }
+  function sizeInfo(doc) {
+    var bytes = byteLength(serialise(doc));
+    var d = normalise(doc);
+    var stored = d.sessions.length, live = liveSessions(d).length;
+    var per = stored > 0 ? bytes / stored : 0;
+    return {
+      bytes: bytes, limit: SIZE_LIMIT, pct: bytes / SIZE_LIMIT,
+      warn: bytes >= SIZE_LIMIT * SIZE_WARN, over: bytes > SIZE_LIMIT,
+      sessions: live, stored: stored, bytesPerSession: per,
+      sessionsRemaining: per > 0 ? Math.max(Math.floor((SIZE_LIMIT - bytes) / per), 0) : null
+    };
+  }
+  /** Drop tombstones and sessions before a cutoff. Returns a new doc. */
+  function archiveBefore(doc, cutoffDate) {
+    var d = normalise(doc);
+    d.sessions = d.sessions.filter(function (s) {
+      return !s.deletedAt && s.date >= cutoffDate;
+    });
+    d.rev += 1;
+    d.updatedAt = now();
+    return d;
+  }
+
+  // ------------------------------------------------------------ validation ---
+
+  function toNum(v) {
+    if (!keep(v)) return null;
+    var n = typeof v === "number" ? v : parseFloat(v);
+    return isFinite(n) ? n : null;
+  }
+
+  function validateSession(s) {
+    var errs = [];
+    if (!s.date) errs.push("Date is required.");
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) errs.push("Date must be YYYY-MM-DD.");
+    if (!(toNum(s.durationMin) > 0)) errs.push("Duration must be above zero.");
+    if (!(toNum(s.avgHr) > 0)) errs.push("Average heart rate must be above zero.");
+    [["avgHr", 240, "Average heart rate"], ["durationMin", 6000, "Duration"],
+     ["distanceKm", 1000, "Distance"], ["ascentM", 40000, "Ascent"],
+     ["descentM", 40000, "Descent"], ["packKg", 60, "Pack weight"],
+     ["rpe", 10, "RPE"], ["soreness", 10, "Soreness"]].forEach(function (x) {
+      var v = toNum(s[x[0]]);
+      if (v != null && (v < 0 || v > x[1])) {
+        errs.push(x[2] + " is out of range (0–" + x[1] + " in metric units).");
+      }
+    });
+    var cad = toNum(s.cadenceSpm);
+    if (cad != null && cad > 0 && (cad < 40 || cad > 260)) {
+      errs.push("Cadence must be between 40 and 260.");
+    }
+    return errs;
+  }
+
+  /**
+   * Non-blocking advisories: the row is valid, but a channel is uncomputable.
+   * A silent zero is as dishonest as a fabricated number — Ê needs mean descent
+   * grade, derived from descent ÷ distance, so descent with no distance yields 0
+   * and without this warning that reads as "an easy session".
+   */
+  function warnSession(s) {
+    var warns = [];
+    var desc = toNum(s.descentM), dist = toNum(s.distanceKm);
+    if (desc && desc > 0 && !(dist > 0)) {
+      warns.push("Ê reads 0 because distance is missing — mean descent grade is " +
+                 "derived from descent ÷ distance. Add distance to price the descent.");
+    }
+    if (!(toNum(s.descentMin) > 0) || !(toNum(s.climbMin) > 0)) {
+      warns.push("B̂ is unavailable until you add descent and climb minutes.");
+    }
+    return warns;
+  }
+
+  // ------------------------------------------------------------------- csv ---
+
+  // Column ORDER is fixed so the formulas in docs/ANALYSIS.md keep working by
+  // letter. Only the unit-bearing header names change with the toggle.
+  function csvHeaders(system, U) {
+    var d = U ? U.label("distance", system) : "km";
+    var e = U ? U.label("elevation", system) : "m";
+    var m = U ? U.label("mass", system) : "kg";
+    return ["date", "label", "duration_min", "avg_hr", "distance_" + d,
+      "ascent_" + e, "descent_" + e, "pack_" + m, "descent_min", "climb_min",
+      "cadence_spm", "rpe", "soreness", "ael_au", "ecc_au", "cyc_au",
+      "mean_descent_grade_pct", "pct_hrr", "edited_at", "id"];
+  }
+  var CSV_HEADERS = csvHeaders("metric", null);
+
+  function csvCell(v) {
+    if (v === undefined || v === null) return "";
+    var s = String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function r1(n) { return typeof n === "number" && isFinite(n) ? Math.round(n * 10) / 10 : ""; }
+
+  /**
+   * Full history as CSV, oldest first. Derived columns are recomputed here from
+   * the current profile. Values are emitted in the profile's display units and
+   * the headers say which — a data file that does not name its units is a trap.
+   * `evaluate` and `U` (the mod-units block) are injected to keep this file dependency
+   * free.
+   */
+  function toCSV(doc, evaluate, U) {
+    var d = normalise(doc), p = profileOf(d), sys = p.units;
+    function disp(v, kind) {
+      if (!U) return v;
+      var x = U.toDisplay(v, kind, sys);
+      return x === null ? "" : x;
+    }
+    var rows = liveSessions(d).slice().reverse().map(function (s) {
+      var r = evaluate ? evaluate(s, p) : {};
+      return [s.date, s.label, s.durationMin, s.avgHr,
+        disp(s.distanceKm, "distance"), disp(s.ascentM, "elevation"),
+        disp(s.descentM, "elevation"), disp(s.packKg || 0, "mass"),
+        s.descentMin || "", s.climbMin || "", s.cadenceSpm || "",
+        s.rpe == null ? "" : s.rpe, s.soreness == null ? "" : s.soreness,
+        r1(r.aeL), r1(r.eccentric), r.cyclic == null ? "" : r1(r.cyclic),
+        r1(r.meanDescentGrade * 100), r1(r.reserveFraction * 100),
+        toISO(s.editedAt), s.id].map(csvCell).join(",");
+    });
+    return [csvHeaders(sys, U).join(",")].concat(rows).join("\n");
+  }
+
+  /** RFC-4180-ish parser. Quoted fields, doubled quotes, CRLF, BOM. */
+  function parseCSV(text) {
+    var rows = [], row = [], field = "", inQ = false, i = 0;
+    var src = String(text == null ? "" : text).replace(/^﻿/, "");
+    while (i < src.length) {
+      var c = src[i];
+      if (inQ) {
+        if (c === '"') {
+          if (src[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQ = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { inQ = true; i++; continue; }
+      if (c === ",") { row.push(field); field = ""; i++; continue; }
+      if (c === "\r") { i++; continue; }
+      if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+      field += c; i++;
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(function (r) {
+      return r.length > 1 || (r.length === 1 && r[0].trim() !== "");
+    });
+  }
+
+  /**
+   * Exported CSV -> session objects, converted back to metric.
+   * Accepts either unit spelling (distance_km or distance_mi, ascent_m or
+   * ascent_ft) so a file exported in one system imports correctly in the other.
+   * Derived columns and any id are ignored: load values are recomputed.
+   */
+  function sessionsFromCSV(text, U) {
+    var rows = parseCSV(text);
+    if (!rows.length) return { sessions: [], errors: ["File is empty."], skipped: 0, system: "metric" };
+    var head = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    var col = {};
+    head.forEach(function (h, i) { col[h] = i; });
+
+    function pickCol(base, names) {
+      for (var i = 0; i < names.length; i++) {
+        if (col[base + "_" + names[i]] !== undefined) {
+          return { idx: col[base + "_" + names[i]], unit: names[i] };
+        }
+      }
+      if (col[base] !== undefined) return { idx: col[base], unit: null };
+      return null;
+    }
+    var distCol = pickCol("distance", ["km", "mi"]);
+    var ascCol = pickCol("ascent", ["m", "ft"]);
+    var descCol = pickCol("descent", ["m", "ft"]);
+    var packCol = pickCol("pack", ["kg", "lb"]);
+
+    if (col.date === undefined || col.duration_min === undefined || col.avg_hr === undefined) {
+      return {
+        sessions: [], skipped: 0, system: "metric",
+        errors: ["Missing required columns. Need at least date, duration_min and avg_hr."]
+      };
+    }
+    var system = (distCol && distCol.unit === "mi") || (descCol && descCol.unit === "ft")
+      ? "imperial" : "metric";
+
+    function cell(r, idx) {
+      return idx === undefined || idx === null || r[idx] === undefined
+        ? "" : String(r[idx]).trim();
+    }
+    function metric(r, c, kind) {
+      if (!c) return null;
+      var raw = toNum(cell(r, c.idx));
+      if (raw == null) return null;
+      if (!U || !c.unit) return raw;
+      var sys = (c.unit === "mi" || c.unit === "ft" || c.unit === "lb") ? "imperial" : "metric";
+      return U.fromDisplay(raw, kind, sys);
+    }
+
+    var out = [], errors = [], skipped = 0;
+    rows.slice(1).forEach(function (r, n) {
+      var s = {
+        date: cell(r, col.date),
+        label: cell(r, col.label) || "Session",
+        durationMin: toNum(cell(r, col.duration_min)),
+        avgHr: toNum(cell(r, col.avg_hr)),
+        distanceKm: metric(r, distCol, "distance") || 0,
+        ascentM: metric(r, ascCol, "elevation") || 0,
+        descentM: metric(r, descCol, "elevation") || 0,
+        packKg: metric(r, packCol, "mass") || 0,
+        descentMin: toNum(cell(r, col.descent_min)),
+        climbMin: toNum(cell(r, col.climb_min)),
+        cadenceSpm: toNum(cell(r, col.cadence_spm)),
+        rpe: toNum(cell(r, col.rpe)),
+        soreness: toNum(cell(r, col.soreness))
+      };
+      var errs = validateSession(s);
+      if (errs.length) {
+        skipped++;
+        if (errors.length < 5) errors.push("Row " + (n + 2) + ": " + errs[0]);
+        return;
+      }
+      s.id = newId();
+      s.editedAt = now();
+      out.push(s);
+    });
+    if (skipped > 5) errors.push("…and " + (skipped - 5) + " more skipped.");
+    return { sessions: out, errors: errors, skipped: skipped, system: system };
+  }
+
+  // ----------------------------------------------------------------- rollup ---
+
+  function weeklyRollup(doc, evaluate) {
+    var d = normalise(doc), p = profileOf(d), buckets = {};
+    liveSessions(d).forEach(function (s) {
+      if (!s.date) return;
+      var wk = mondayOf(s.date);
+      if (!buckets[wk]) {
+        buckets[wk] = { week: wk, sessions: 0, aeL: 0, ecc: 0, cyc: 0, cycCount: 0,
+                        durationMin: 0, distanceKm: 0, ascentM: 0, descentM: 0,
+                        rpeSum: 0, rpeN: 0, soreSum: 0, soreN: 0 };
+      }
+      var b = buckets[wk], r = evaluate ? evaluate(s, p) : {};
+      b.sessions++;
+      b.aeL += r.aeL || 0;
+      b.ecc += r.eccentric || 0;
+      if (r.cyclic != null) { b.cyc += r.cyclic; b.cycCount++; }
+      b.durationMin += s.durationMin || 0;
+      b.distanceKm += s.distanceKm || 0;
+      b.ascentM += s.ascentM || 0;
+      b.descentM += s.descentM || 0;
+      if (s.rpe != null) { b.rpeSum += s.rpe; b.rpeN++; }
+      if (s.soreness != null) { b.soreSum += s.soreness; b.soreN++; }
+    });
+    return Object.keys(buckets).sort().reverse().map(function (k) {
+      var b = buckets[k];
+      b.meanRpe = b.rpeN ? b.rpeSum / b.rpeN : null;
+      b.meanSoreness = b.soreN ? b.soreSum / b.soreN : null;
+      b.divergence = b.aeL > 0 ? b.ecc / b.aeL : null;
+      return b;
+    });
+  }
+
+  function mondayOf(isoDate) {
+    var dt = new Date(String(isoDate).slice(0, 10) + "T12:00:00Z");
+    var dow = (dt.getUTCDay() + 6) % 7;
+    dt.setUTCDate(dt.getUTCDate() - dow);
+    return dt.toISOString().slice(0, 10);
+  }
+
+  function windowTotals(doc, evaluate, fromDays, toDays, today) {
+    var d = normalise(doc), p = profileOf(d);
+    var ref = today ? new Date(today) : new Date();
+    var out = { aeL: 0, ecc: 0, count: 0 };
+    liveSessions(d).forEach(function (s) {
+      if (!s.date) return;
+      var age = (ref - new Date(s.date + "T12:00:00")) / 86400000;
+      if (age >= fromDays && age < toDays) {
+        var r = evaluate ? evaluate(s, p) : {};
+        out.aeL += r.aeL || 0;
+        out.ecc += r.eccentric || 0;
+        out.count++;
+      }
+    });
+    return out;
+  }
+
+  function correlate(pairs) {
+    var n = (pairs || []).length;
+    if (n < 3) return null;
+    var mx = 0, my = 0, i;
+    for (i = 0; i < n; i++) { mx += pairs[i][0]; my += pairs[i][1]; }
+    mx /= n; my /= n;
+    var sxy = 0, sxx = 0, syy = 0;
+    for (i = 0; i < n; i++) {
+      var dx = pairs[i][0] - mx, dy = pairs[i][1] - my;
+      sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+    }
+    if (sxx === 0 || syy === 0) return null;
+    return sxy / Math.sqrt(sxx * syy);
+  }
+
+  // ------------------------------------------------------------ local cache ---
+
+  function loadLocal() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      return { doc: unpack(o.doc), config: o.config || {}, dirty: !!o.dirty };
+    } catch (e) { return null; }
+  }
+  function saveLocal(doc, config, dirty) {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        doc: pack(doc), config: config || {}, dirty: !!dirty
+      }));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // -------------------------------------------------------------- jsonbin ---
+
+  function cleanKey(s) {
+    // Copy-paste from a dashboard commonly drags in whitespace, and the field
+    // is a password input so it is invisible. Also strip a stray "X-Access-Key:"
+    // prefix if the whole header line was pasted.
+    return String(s == null ? "" : s)
+      .replace(/^\s*x-access-key\s*:\s*/i, "")
+      .replace(/^\s*x-master-key\s*:\s*/i, "")
+      .replace(/[\r\n\t]/g, "")
+      .trim();
+  }
+  function cleanBinId(s) {
+    // Accept a pasted dashboard URL as well as a bare id.
+    var t = String(s == null ? "" : s).trim();
+    var m = t.match(/([0-9a-f]{24})/i);
+    return m ? m[1] : t.replace(/[\r\n\t\s]/g, "");
+  }
+
+  function headers(config, forWrite) {
+    var h = { "X-Access-Key": cleanKey(config.accessKey) };
+    if (forWrite) {
+      h["Content-Type"] = "application/json";
+      h["X-Bin-Versioning"] = "true";
+    }
+    return h;
+  }
+
+  function configured(config) {
+    return !!(config && cleanBinId(config.binId) && cleanKey(config.accessKey));
+  }
+
+  function remoteRead(config) {
+    if (!configured(config)) {
+      return Promise.reject(err("not-configured", "Bin ID and Access Key are required."));
+    }
+    // meta=false as a query parameter rather than the X-Bin-Meta header: one
+    // fewer custom header on the CORS preflight, same effect per the docs.
+    return fetch(API_ROOT + "/b/" + encodeURIComponent(cleanBinId(config.binId)) +
+                 "/latest?meta=false", { method: "GET", headers: headers(config, false) })
+      .then(readBody)
+      .then(function (body) { return unpack(body && body.record ? body.record : body); });
+  }
+
+  function remoteWrite(config, doc) {
+    if (!configured(config)) {
+      return Promise.reject(err("not-configured", "Bin ID and Access Key are required."));
+    }
+    var payload = serialise(doc);
+    var size = byteLength(payload);
+    if (size > SIZE_LIMIT) {
+      return Promise.reject(err("too-large",
+        "Log is " + Math.round(size / 1024) + " KB and JSONBin's free tier rejects " +
+        "anything over 100 KB. Export CSV, then archive older sessions."));
+    }
+    return fetch(API_ROOT + "/b/" + encodeURIComponent(cleanBinId(config.binId)), {
+      method: "PUT", headers: headers(config, true), body: payload
+    }).then(readBody).then(function (body) {
+      return unpack(body && body.record ? body.record : pack(doc));
+    });
+  }
+
+  /** Read-before-write: the bin is one document, so a blind PUT loses edits. */
+  function syncPush(config, localDoc) {
+    return remoteRead(config).then(function (remote) {
+      var merged = mergeDocs(localDoc, remote);
+      return remoteWrite(config, merged).then(function () { return merged; });
+    }, function (e) {
+      if (e && (e.code === "not-found" || e.code === "empty")) {
+        var seeded = mergeDocs(localDoc, emptyDoc());
+        return remoteWrite(config, seeded).then(function () { return seeded; });
+      }
+      throw e;
+    });
+  }
+
+  function readBody(res) {
+    return res.text().then(function (txt) {
+      var parsed = null;
+      try { parsed = txt ? JSON.parse(txt) : null; } catch (e) { /* error page */ }
+      if (!res.ok) {
+        var msg = (parsed && (parsed.message || parsed.error)) || txt || ("HTTP " + res.status);
+        throw err(codeFor(res.status, msg), msg, res.status);
+      }
+      if (parsed === null) throw err("empty", "Bin returned no content.");
+      return parsed;
+    });
+  }
+
+  function codeFor(status, msg) {
+    var m = String(msg || "").toLowerCase();
+    if (m.indexOf("requests exhausted") >= 0) return "quota";
+    if (m.indexOf("100kb") >= 0) return "too-large";
+    // Check for the permission wording before the generic key wording: both are
+    // 401/403 and they have completely different fixes.
+    if (m.indexOf("permission") >= 0) return "no-permission";
+    // JSONBin writes this with a curly-free apostrophe ("doesn't belong"), and
+    // merges two distinct causes into one sentence. Match both spellings.
+    if (/does ?n['’]?o?t belong to your account|does not belong to your account/.test(m)) {
+      return "wrong-account";
+    }
+    if (m.indexOf("invalid bin id") >= 0) return "bad-bin-id";
+    if (status === 401 || status === 403) return "bad-key";
+    if (status === 404) return "not-found";
+    if (status === 429) return "rate-limited";
+    return "error";
+  }
+
+  function err(code, message, status) {
+    var e = new Error(message || code);
+    e.code = code;
+    if (status) e.status = status;
+    return e;
+  }
+
+  function explain(e) {
+    switch (e && e.code) {
+      case "not-configured": return "Add your Bin ID and Access Key in Sync settings.";
+      case "no-permission":
+        return "The Access Key exists but has no permission for this call. A new " +
+               "Access Key starts with NO permissions — open API Keys in JSONBin and " +
+               "tick both Bins Read and Bins Update on it.";
+      case "bad-key":
+        return "Access Key rejected. Check you copied the Access Key (not the Master " +
+               "Key) with no trailing spaces. Run tools/jsonbin-doctor.html for the exact error.";
+      case "wrong-account":
+        return "JSONBin merges two causes into this one message: either the key value is " +
+               "wrong, or the bin belongs to a different account than the key. Check both " +
+               "were made in the same logged-in account, then re-copy the key.";
+      case "bad-bin-id":   return "That Bin ID is malformed. It should be 24 hex characters.";
+      case "not-found":    return "Bin ID not found on this account. Check the ID.";
+      case "quota":        return "JSONBin requests exhausted. Your log is safe locally — export CSV.";
+      case "too-large":    return e.message;
+      case "rate-limited": return "Rate limited. Wait a moment and press Sync again.";
+      case "empty":        return "Bin is empty — press Sync to seed it with your local log.";
+      default:             return (e && e.message) || "Sync failed. Your log is still saved locally.";
+    }
+  }
+
+  return {
+    SCHEMA: SCHEMA, LS_KEY: LS_KEY, API_ROOT: API_ROOT,
+    SIZE_LIMIT: SIZE_LIMIT, CSV_HEADERS: CSV_HEADERS, csvHeaders: csvHeaders,
+    SESSION_MAP: SESSION_MAP, PROFILE_MAP: PROFILE_MAP,
+    DEFAULT_PROFILE: DEFAULT_PROFILE,
+    emptyDoc: emptyDoc, normalise: normalise, pack: pack, unpack: unpack,
+    profileOf: profileOf, newId: newId, now: now, toISO: toISO, toEpoch: toEpoch,
+    liveSessions: liveSessions, mergeDocs: mergeDocs,
+    serialise: serialise, sizeInfo: sizeInfo, byteLength: byteLength,
+    archiveBefore: archiveBefore,
+    validateSession: validateSession, warnSession: warnSession,
+    toCSV: toCSV, parseCSV: parseCSV, sessionsFromCSV: sessionsFromCSV,
+    weeklyRollup: weeklyRollup, mondayOf: mondayOf,
+    windowTotals: windowTotals, correlate: correlate,
+    loadLocal: loadLocal, saveLocal: saveLocal,
+    cleanKey: cleanKey, cleanBinId: cleanBinId,
+    configured: configured, remoteRead: remoteRead, remoteWrite: remoteWrite,
+    syncPush: syncPush, explain: explain, codeFor: codeFor
+  };
+});
+</script>
+<script id="app">
+/* app.js — Load Log UI.
+ *
+ * Storage is delegated to the mod-store block (JSONBin source of truth, localStorage
+ * cache). Unit conversion is delegated to the mod-units block and happens ONLY at the
+ * form boundary — everything held in `doc` and sent to the bin is metric.
+ */
+(function () {
+  "use strict";
+  var LM = window.LoadModel, S = window.Store, U = window.Units;
+
+  var doc = S.emptyDoc();
+  var config = { binId: "", accessKey: "" };
+  var dirty = false;
+  var editingId = null;
+  var syncing = false;
+  var units = "metric";
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function say(id, msg, kind) {
+    var el = $(id);
+    if (!el) return;
+    el.textContent = msg || "";
+    el.className = "savenote" + (kind ? " " + kind : "");
+  }
+  var note = function (m, k) { say("note", m, k); };
+
+  // --------------------------------------------------------------- units ----
+  // Raw field readers are metric-agnostic; the `m*` readers return metric.
+
+  function rawNum(id) { var v = parseFloat($(id).value); return isFinite(v) ? v : 0; }
+  function rawOpt(id) {
+    var s = ($(id).value || "").trim();
+    if (!s) return null;
+    var v = parseFloat(s);
+    return isFinite(v) ? v : null;
+  }
+  /** Field value (in display units) -> metric. */
+  function mNum(id, kind) {
+    var v = U.fromDisplay(rawNum(id), kind, units);
+    return v == null ? 0 : v;
+  }
+  /** Metric -> field value, respecting the current system. */
+  function setField(id, metricValue, kind) {
+    var d = U.toDisplay(metricValue, kind, units);
+    $(id).value = d == null ? "" : d;
+  }
+
+  function applyUnitLabels() {
+    var pairs = [
+      ["uDist", "distance"], ["uUp", "elevation"], ["uDown", "elevation"],
+      ["uPack", "mass"], ["uMass", "mass"], ["uStep", "steplen"]
+    ];
+    pairs.forEach(function (p) {
+      var el = $(p[0]);
+      if (el) el.textContent = U.label(p[1], units);
+    });
+    var dl = U.label("distance", units), el = U.label("elevation", units);
+    $("thDist").textContent = dl;
+    $("thUp").textContent = "D+ " + el;
+    $("thDown").textContent = "D− " + el;
+    $("thwDist").textContent = dl;
+    $("thwUp").textContent = "D+ " + el;
+    $("thwDown").textContent = "D− " + el;
+
+    // input step sizes should match the unit's natural granularity
+    [["dist", "distance"], ["up", "elevation"], ["down", "elevation"],
+     ["pack", "mass"], ["mBody", "mass"], ["sl", "steplen"]].forEach(function (p) {
+      $(p[0]).setAttribute("step", String(U.step(p[1], units)));
+    });
+
+    $("unitMetric").setAttribute("aria-pressed", String(units === "metric"));
+    $("unitImperial").setAttribute("aria-pressed", String(units === "imperial"));
+    $("unitTag").textContent = units === "metric" ? "Metric" : "Imperial";
+  }
+
+  /**
+   * Switch systems. Every numeric field is re-rendered from its metric value,
+   * so nothing is reinterpreted — 16 km becomes 9.94 mi, not 16 mi.
+   */
+  function setUnits(next, opts) {
+    var o = opts || {};
+    if (next !== "metric" && next !== "imperial") next = "metric";
+    if (next === units && !o.force) return;
+
+    // Capture current field values in metric BEFORE changing the system.
+    var held = o.skipFields ? null : {
+      dist: mNum("dist", "distance"),
+      up: mNum("up", "elevation"),
+      down: mNum("down", "elevation"),
+      pack: mNum("pack", "mass"),
+      mBody: mNum("mBody", "mass"),
+      sl: mNum("sl", "steplen")
+    };
+
+    units = next;
+    applyUnitLabels();
+
+    if (held) {
+      setField("dist", held.dist, "distance");
+      setField("up", held.up, "elevation");
+      setField("down", held.down, "elevation");
+      setField("pack", held.pack, "mass");
+      setField("mBody", held.mBody, "mass");
+      setField("sl", held.sl, "steplen");
+    }
+
+    if (!o.silent) {
+      doc.profile = readProfile();
+      doc.rev += 1;
+      doc.updatedAt = S.now();
+      dirty = true;
+      persist();
+    }
+    refreshLive();
+    render();
+  }
+
+  // ----------------------------------------------------------- form <-> doc --
+
+  function readProfile() {
+    return {
+      massKg: mNum("mBody", "mass"),
+      male: $("sex").value === "m",
+      hrMax: rawNum("hrMax"),
+      hrRest: rawNum("hrRest"),
+      descentStepLengthM: mNum("sl", "steplen"),
+      kMuscle: rawNum("km"),
+      kBone: rawNum("kb"),
+      units: units
+    };
+  }
+  function writeProfile(p) {
+    setField("mBody", p.massKg, "mass");
+    $("sex").value = p.male ? "m" : "f";
+    $("hrMax").value = p.hrMax;
+    $("hrRest").value = p.hrRest;
+    setField("sl", p.descentStepLengthM, "steplen");
+    $("km").value = p.kMuscle;
+    $("kb").value = p.kBone;
+  }
+
+  function readSession() {
+    return {
+      id: editingId || S.newId(),
+      date: $("date").value || new Date().toISOString().slice(0, 10),
+      label: ($("label").value || "").trim() || "Session",
+      durationMin: rawNum("dur"),
+      avgHr: rawNum("hr"),
+      distanceKm: mNum("dist", "distance"),
+      ascentM: mNum("up", "elevation"),
+      descentM: mNum("down", "elevation"),
+      descentMin: rawOpt("dmin") || 0,
+      climbMin: rawOpt("umin") || 0,
+      cadenceSpm: rawOpt("cad") || 0,
+      packKg: mNum("pack", "mass"),
+      rpe: rawOpt("rpe"),
+      soreness: rawOpt("sore"),
+      editedAt: S.now()
+    };
+  }
+  function writeSession(s) {
+    $("date").value = s.date || "";
+    $("label").value = s.label || "";
+    $("dur").value = s.durationMin || "";
+    $("hr").value = s.avgHr || "";
+    setField("dist", s.distanceKm, "distance");
+    setField("up", s.ascentM, "elevation");
+    setField("down", s.descentM, "elevation");
+    $("dmin").value = s.descentMin || "";
+    $("umin").value = s.climbMin || "";
+    $("cad").value = s.cadenceSpm || "";
+    setField("pack", s.packKg || 0, "mass");
+    $("rpe").value = s.rpe == null ? "" : s.rpe;
+    $("sore").value = s.soreness == null ? "" : s.soreness;
+  }
+  function clearForm() {
+    editingId = null;
+    $("date").value = new Date().toISOString().slice(0, 10);
+    $("label").value = "";
+    ["dmin", "umin", "cad", "rpe", "sore"].forEach(function (k) { $(k).value = ""; });
+    setEditMode();
+  }
+  function setEditMode() {
+    var editing = !!editingId;
+    $("save").textContent = editing ? "Update session" : "Add to log";
+    $("cancelEdit").hidden = !editing;
+    $("editBanner").hidden = !editing;
+    if (editing) {
+      $("editBanner").textContent =
+        "Editing an existing session — the same row will be updated, not duplicated.";
+    }
+  }
+
+  // ------------------------------------------------------------- persistence -
+
+  function persist() {
+    doc.profile = readProfile();
+    S.saveLocal(doc, config, dirty);
+  }
+
+  function pushRemote(reason) {
+    if (!S.configured(config)) { renderSync(); return Promise.resolve(); }
+    if (syncing) return Promise.resolve();
+    syncing = true;
+    renderSync();
+    return S.syncPush(config, doc).then(function (merged) {
+      doc = merged;
+      dirty = false;
+      adoptProfile();
+      S.saveLocal(doc, config, false);
+      syncing = false;
+      render();
+      say("syncNote", "Synced " + (reason || "") + " · rev " + doc.rev + " · " +
+          S.liveSessions(doc).length + " sessions in the bin", "ok");
+    }).catch(function (e) {
+      syncing = false;
+      dirty = true;
+      S.saveLocal(doc, config, true);
+      render();
+      say("syncNote", S.explain(e), "bad");
+    });
+  }
+
+  function pullRemote() {
+    if (!S.configured(config)) {
+      say("syncNote", "Add your Bin ID and Access Key first.", "bad");
+      return;
+    }
+    if (syncing) return;
+    syncing = true;
+    renderSync();
+    S.remoteRead(config).then(function (remote) {
+      doc = S.mergeDocs(doc, remote);
+      dirty = false;
+      adoptProfile();
+      S.saveLocal(doc, config, false);
+      syncing = false;
+      render();
+      say("syncNote", "Pulled " + S.liveSessions(doc).length +
+          " sessions · rev " + doc.rev, "ok");
+    }).catch(function (e) {
+      syncing = false;
+      renderSync();
+      say("syncNote", S.explain(e), "bad");
+    });
+  }
+
+  /** Take the profile from the document, including its unit preference. */
+  function adoptProfile() {
+    var p = S.profileOf(doc);
+    if (p.units !== units) setUnits(p.units, { silent: true, skipFields: true, force: true });
+    writeProfile(p);
+  }
+
+  // ------------------------------------------------------------------ render -
+
+  function refreshLive() {
+    var p = readProfile();
+    var s = readSession();
+    var r = LM.evaluateSession(s, p);
+    var noGrade = (s.descentM > 0) && !(s.distanceKm > 0);
+    $("oAeL").textContent = isFinite(r.aeL) ? Math.round(r.aeL) : "—";
+    $("oE").textContent = noGrade ? "—" : Math.round(r.eccentric);
+    $("oEu").textContent = noGrade ? "Ê · needs distance" : "Ê · AU";
+    $("oB").textContent = r.cyclic == null ? "—" : Math.round(r.cyclic);
+    $("oBu").textContent = r.cyclic == null ? "B̂ · add climb + descent min" : "B̂ · AU";
+    $("oG").textContent = r.meanDescentGrade ? (r.meanDescentGrade * 100).toFixed(1) : "—";
+    $("oF").textContent = isFinite(r.reserveFraction) ? Math.round(r.reserveFraction * 100) : "—";
+
+    var warns = S.warnSession(s).filter(function (w) { return /distance/i.test(w); });
+    $("warnBanner").hidden = warns.length === 0;
+    if (warns.length) $("warnBanner").textContent = warns[0];
+
+    // Rule of thumb, restated in the active unit system.
+    var per = LM.eccentricPer100m(0.12, p.massKg, p.descentStepLengthM);
+    var rt = U.perHundredElevation(per, units);
+    $("ruleOfThumb").textContent = "≈ " + rt.value + " AU per " + rt.per +
+      " of descent at 12 % grade, at " + U.format(p.massKg, "mass", units);
+  }
+
+  function renderSync() {
+    var tag = $("syncTag");
+    var dot = '<span class="dot ' + (syncing ? "pend" :
+      (!S.configured(config) ? "off" : (dirty ? "pend" : "ok"))) + '"></span>';
+    var text = syncing ? "Sync: working…"
+      : !S.configured(config) ? "Sync: local only"
+      : dirty ? "Sync: pending changes" : "Sync: up to date";
+    tag.innerHTML = dot + text;
+  }
+
+  function renderStorage() {
+    var info = S.sizeInfo(doc);
+    $("szBytes").textContent = (info.bytes / 1024).toFixed(1);
+    $("szPct").textContent = Math.round(info.pct * 100);
+    $("szBar").style.width = Math.min(info.pct * 100, 100) + "%";
+    $("szBar").style.background = info.over ? "var(--bad)"
+      : info.warn ? "var(--flag)" : "var(--aero)";
+    $("szRoom").textContent = info.sessionsRemaining == null ? "—" : info.sessionsRemaining;
+    var warn = $("szWarn");
+    if (info.over) {
+      warn.hidden = false;
+      warn.textContent = "Over the 100 KB free-tier cap — writes will be rejected. " +
+        "Export CSV, then archive sessions older than a year.";
+    } else if (info.warn) {
+      warn.hidden = false;
+      warn.textContent = "Past 80 % of the 100 KB cap. Export CSV and archive soon.";
+    } else {
+      warn.hidden = true;
+    }
+  }
+
+  function render() {
+    var p = readProfile();
+    doc.profile = p;
+    var live = S.liveSessions(doc);
+    var dd = U.decimals("distance", units);
+
+    var tb = $("logBody");
+    tb.innerHTML = "";
+    $("logEmpty").hidden = live.length > 0;
+    live.forEach(function (s) {
+      var r = LM.evaluateSession(s, p);
+      var noGrade = (s.descentM > 0) && !(s.distanceKm > 0);
+      var tr = document.createElement("tr");
+      if (s.id === editingId) tr.className = "editing";
+      tr.innerHTML =
+        "<td>" + esc(s.date) + "</td>" +
+        '<td class="lbl">' + esc(s.label) + "</td>" +
+        "<td>" + Math.round(s.durationMin) + "</td>" +
+        "<td>" + Math.round(s.avgHr) + "</td>" +
+        "<td>" + (U.toDisplay(s.distanceKm || 0, "distance", units)).toFixed(dd) + "</td>" +
+        "<td>" + Math.round(U.toDisplay(s.ascentM || 0, "elevation", units)) + "</td>" +
+        "<td>" + Math.round(U.toDisplay(s.descentM || 0, "elevation", units)) + "</td>" +
+        '<td class="ae">' + Math.round(r.aeL) + "</td>" +
+        '<td class="me">' + (noGrade ? "—" : Math.round(r.eccentric)) + "</td>" +
+        '<td class="me">' + (r.cyclic == null ? "—" : Math.round(r.cyclic)) + "</td>" +
+        "<td>" + (s.rpe == null ? "—" : s.rpe) + "</td>" +
+        "<td>" + (s.soreness == null ? "—" : s.soreness) + "</td>" +
+        '<td><button type="button" class="del ed" data-id="' + esc(s.id) + '" ' +
+          'title="Edit — use this to add next-day soreness">edit</button></td>' +
+        '<td><button type="button" class="del rm" data-id="' + esc(s.id) + '" ' +
+          'aria-label="Delete session">×</button></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll("button.ed").forEach(function (b) {
+      b.addEventListener("click", function () { beginEdit(b.getAttribute("data-id")); });
+    });
+    tb.querySelectorAll("button.rm").forEach(function (b) {
+      b.addEventListener("click", function () { removeSession(b.getAttribute("data-id")); });
+    });
+
+    renderWeeks();
+    renderRolling();
+    renderCorrelations(p);
+    renderStorage();
+    renderSync();
+  }
+
+  function renderWeeks() {
+    var weeks = S.weeklyRollup(doc, LM.evaluateSession);
+    var dd = U.decimals("distance", units);
+    var tb = $("weekBody");
+    tb.innerHTML = "";
+    $("weekEmpty").hidden = weeks.length > 0;
+    weeks.forEach(function (w) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + esc(w.week) + "</td><td>" + w.sessions + "</td>" +
+        "<td>" + (Math.round(w.durationMin / 6) / 10) + "</td>" +
+        "<td>" + U.toDisplay(w.distanceKm, "distance", units).toFixed(dd) + "</td>" +
+        "<td>" + Math.round(U.toDisplay(w.ascentM, "elevation", units)) + "</td>" +
+        "<td>" + Math.round(U.toDisplay(w.descentM, "elevation", units)) + "</td>" +
+        '<td class="ae">' + Math.round(w.aeL) + "</td>" +
+        '<td class="me">' + Math.round(w.ecc) + "</td>" +
+        "<td>" + (w.divergence == null ? "—" : w.divergence.toFixed(2)) + "</td>" +
+        "<td>" + (w.meanRpe == null ? "—" : w.meanRpe.toFixed(1)) + "</td>" +
+        "<td>" + (w.meanSoreness == null ? "—" : w.meanSoreness.toFixed(1)) + "</td>";
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderRolling() {
+    var a = S.windowTotals(doc, LM.evaluateSession, -1, 7);
+    var b = S.windowTotals(doc, LM.evaluateSession, 7, 14);
+    $("r7a").textContent = Math.round(a.aeL);
+    $("r7m").textContent = Math.round(a.ecc);
+    $("p7a").textContent = b.count ? Math.round(b.aeL) : "—";
+    $("p7m").textContent = b.count ? Math.round(b.ecc) : "—";
+    $("r7an").textContent = a.count + (a.count === 1 ? " session" : " sessions");
+    $("r7mn").textContent = a.ecc > 0 ? (a.ecc / 100).toFixed(1) + "× canonical bout"
+                                      : "no descent logged";
+  }
+
+  function renderCorrelations(p) {
+    var ePairs = [], aPairs = [];
+    S.liveSessions(doc).forEach(function (s) {
+      var r = LM.evaluateSession(s, p);
+      if (s.soreness != null) ePairs.push([r.eccentric, s.soreness]);
+      if (s.rpe != null) aPairs.push([r.aeL, s.rpe]);
+    });
+    setCorr("cSore", "cSoreN", S.correlate(ePairs), ePairs.length);
+    setCorr("cRpe", "cRpeN", S.correlate(aPairs), aPairs.length);
+  }
+  function setCorr(vId, nId, r, n) {
+    if (r == null || n < 5) {
+      $(vId).textContent = "—";
+      $(nId).textContent = n + " of 5 scored sessions";
+      return;
+    }
+    $(vId).textContent = "r = " + r.toFixed(2);
+    var strength = Math.abs(r) >= 0.7 ? "strong" : Math.abs(r) >= 0.4 ? "moderate" : "weak";
+    $(nId).textContent = strength + ", n = " + n;
+  }
+
+  // --------------------------------------------------------------- mutations -
+
+  function commitSession() {
+    var s = readSession();
+    var errs = S.validateSession(s);
+    if (errs.length) { note(errs[0], "bad"); return; }
+    var idx = -1;
+    doc.sessions.forEach(function (x, i) { if (x.id === s.id) idx = i; });
+    if (idx >= 0) doc.sessions[idx] = s; else doc.sessions.push(s);
+    doc.rev += 1;
+    doc.updatedAt = S.now();
+    dirty = true;
+    var wasEdit = !!editingId;
+    clearForm();
+    persist();
+    refreshLive();
+    render();
+    note(wasEdit ? "Updated " + s.date + "." :
+      "Logged " + s.date + " — " + S.liveSessions(doc).length + " sessions stored.", "ok");
+    pushRemote(wasEdit ? "edit" : "new session");
+  }
+
+  function beginEdit(id) {
+    var found = null;
+    doc.sessions.forEach(function (s) { if (s.id === id) found = s; });
+    if (!found) return;
+    editingId = id;
+    writeSession(found);
+    setEditMode();
+    refreshLive();
+    render();
+    note("Editing " + found.date + ". Add soreness, then Update.", "");
+    $("entry").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function removeSession(id) {
+    doc.sessions.forEach(function (s) {
+      if (s.id === id) { s.deletedAt = S.now(); s.editedAt = S.now(); }
+    });
+    doc.rev += 1;
+    doc.updatedAt = S.now();
+    dirty = true;
+    if (editingId === id) clearForm();
+    persist();
+    render();
+    note("Deleted. A tombstone is kept so the delete survives syncing.", "ok");
+    pushRemote("delete");
+  }
+
+  // -------------------------------------------------------------------- csv --
+
+  function csv() { return S.toCSV(doc, LM.evaluateSession, U); }
+
+  function download(text, name, type) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  // ------------------------------------------------------------------- wire --
+
+  function init() {
+    clearForm();
+
+    var saved = S.loadLocal();
+    if (saved) {
+      doc = saved.doc;
+      config = {
+        binId: S.cleanBinId(saved.config.binId || ""),
+        accessKey: S.cleanKey(saved.config.accessKey || "")
+      };
+      dirty = saved.dirty;
+      $("binId").value = config.binId;
+      $("accessKey").value = config.accessKey;
+    }
+
+    var p = S.profileOf(doc);
+    units = p.units;
+    applyUnitLabels();
+    writeProfile(p);
+
+    refreshLive();
+    render();
+
+    if (S.configured(config)) {
+      say("syncNote", "Checking the bin…", "");
+      pullRemote();
+    } else {
+      say("syncNote", "Running local-only. Add a bin below for cross-device history.", "");
+    }
+
+    document.addEventListener("input", onFieldChange);
+    document.addEventListener("change", onFieldChange);
+
+    $("unitMetric").addEventListener("click", function () { setUnits("metric"); });
+    $("unitImperial").addEventListener("click", function () { setUnits("imperial"); });
+
+    $("save").addEventListener("click", commitSession);
+    $("cancelEdit").addEventListener("click", function () {
+      clearForm(); refreshLive(); render(); note("Edit cancelled.", "");
+    });
+    $("dlCsv").addEventListener("click", function () {
+      download(csv(), "ultra-load-log-" + new Date().toISOString().slice(0, 10) + ".csv",
+               "text/csv;charset=utf-8");
+      note("CSV downloaded in " + units + " units — " +
+           S.liveSessions(doc).length + " sessions.", "ok");
+    });
+    $("copyCsv").addEventListener("click", function () {
+      var txt = csv();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(
+          function () { note("CSV copied to clipboard.", "ok"); },
+          function () { note("Clipboard blocked — use Download CSV.", "bad"); });
+      } else { note("Clipboard unavailable — use Download CSV.", "bad"); }
+    });
+    $("dlJson").addEventListener("click", function () {
+      download(JSON.stringify(S.pack(doc), null, 2),
+               "ultra-load-bin-" + new Date().toISOString().slice(0, 10) + ".json",
+               "application/json");
+      note("Raw bin JSON downloaded — paste this into JSONBin to restore.", "ok");
+    });
+    $("syncNow").addEventListener("click", function () { pushRemote("manually"); });
+    $("pullNow").addEventListener("click", pullRemote);
+    $("archive").addEventListener("click", function () {
+      var cutoff = ($("archiveDate").value || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) {
+        say("syncNote", "Enter a cutoff date first.", "bad");
+        return;
+      }
+      var before = S.liveSessions(doc).length;
+      doc = S.archiveBefore(doc, cutoff);
+      dirty = true;
+      persist();
+      render();
+      say("syncNote", "Removed " + (before - S.liveSessions(doc).length) +
+          " session(s) before " + cutoff + ". Press Sync to write the smaller bin.", "ok");
+    });
+  }
+
+  function onFieldChange(ev) {
+    var t = ev.target;
+    if (t.closest("#logBody") || t.closest("#weekBody")) return;
+    if (t.id === "binId" || t.id === "accessKey") {
+      config.binId = S.cleanBinId($("binId").value);
+      config.accessKey = S.cleanKey($("accessKey").value);
+      S.saveLocal(doc, config, dirty);
+      renderSync();
+      return;
+    }
+    if (t.id === "archiveDate") return;
+    refreshLive();
+    persist();
+    render();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
 </body>
 </html>
