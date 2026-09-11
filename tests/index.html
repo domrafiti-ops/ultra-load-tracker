@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tests — Two-Channel Ultra Load Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/styles.css">
+<style>
+  .res{border:1px solid var(--line); border-radius:3px; overflow:hidden; background:var(--surface); margin-bottom:26px}
+  .res .row{display:grid; grid-template-columns:74px 1fr; border-bottom:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace; font-size:13px}
+  .res .row:last-child{border-bottom:none}
+  .res .st{padding:9px 12px; font-weight:600; letter-spacing:.06em}
+  .res .st.pass{color:var(--ok); background:var(--aero-soft)}
+  .res .st.fail{color:var(--bad); background:var(--mech-soft)}
+  .res .bd{padding:9px 12px}
+  .res .bd b{font-weight:600}
+  .res .bd .d{color:var(--muted); display:block; margin-top:2px}
+  .res .bd .nt{color:var(--ink-2); display:block; margin-top:2px; font-family:"Source Serif 4",Georgia,serif; font-size:13.5px}
+  .summary{font-family:Archivo,sans-serif; font-size:26px; font-weight:700; margin:0 0 4px}
+  h3.suite{font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    margin:0 0 12px; font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="top">
+  <a href="../index.html">Load Log</a>
+  <a href="../model.html">The Model</a>
+  <a href="index.html" aria-current="page">Tests</a>
+</nav>
+
+<header class="mast">
+  <div class="kicker">Regression net</div>
+  <h1>Model &amp; Store Assertions</h1>
+  <p class="standfirst">Two suites. The <b>model</b> suite checks every expected value against a figure reported in a cited paper or hand-calculated during derivation. The <b>store</b> suite checks the merge logic — which matters most, because a bug there does not throw, it silently eats a session. Run headlessly with <code>node tests/load-model.test.js</code> and <code>node tests/store.test.js</code>.</p>
+</header>
+
+<section style="margin-top:0">
+  <div class="panel" style="margin-bottom:22px">
+    <p class="summary" id="summary">Running…</p>
+    <p class="savenote" id="subsummary">&nbsp;</p>
+  </div>
+
+  <h3 class="suite">Model — formulas, calibration, validation</h3>
+  <div class="res" id="modelResults"></div>
+
+  <h3 class="suite">Store — schema, merge, tombstones, size budget, CSV</h3>
+  <div class="res" id="storeResults"></div>
+</section>
+
+<footer>
+  Sources: <code>tests/load-model.test.js</code>, <code>tests/store.test.js</code>. Coefficient provenance is in <a href="../model.html#ledger">the evidence ledger</a>.
+</footer>
+
+</div>
+
+<script src="../lib/load-model.js"></script>
+<script src="../lib/store.js"></script>
+<script src="load-model.test.js"></script>
+<script src="store.test.js"></script>
+<script>
+(function () {
+  "use strict";
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function paint(hostId, out) {
+    document.getElementById(hostId).innerHTML = out.results.map(function (r) {
+      return '<div class="row">' +
+        '<div class="st ' + (r.pass ? "pass" : "fail") + '">' + (r.pass ? "PASS" : "FAIL") + "</div>" +
+        '<div class="bd"><b>' + esc(r.name) + "</b>" +
+        (r.detail ? '<span class="d">' + esc(r.detail) + "</span>" : "") +
+        (r.note ? '<span class="nt">' + esc(r.note) + "</span>" : "") +
+        "</div></div>";
+    }).join("");
+  }
+
+  var model = window.runLoadModelTests();
+  var store = window.runStoreTests();
+  paint("modelResults", model);
+  paint("storeResults", store);
+
+  var passed = model.passed + store.passed;
+  var failed = model.failed + store.failed;
+  var total = model.results.length + store.results.length;
+  var s = document.getElementById("summary");
+  s.textContent = passed + " passed, " + failed + " failed";
+  s.style.color = failed ? "var(--bad)" : "var(--ok)";
+  document.getElementById("subsummary").textContent =
+    total + " assertions — " + model.results.length + " model, " + store.results.length + " store.";
+})();
+</script>
+</body>
+</html>
