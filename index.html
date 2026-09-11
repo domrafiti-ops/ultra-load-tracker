@@ -210,6 +210,10 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
   .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
   .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
+  pre#diag{background:var(--surface-2); border:1px solid var(--line); border-radius:3px;
+    padding:12px 14px; font-family:"IBM Plex Mono",monospace; font-size:12.5px;
+    line-height:1.55; overflow-x:auto; white-space:pre-wrap; word-break:break-word;
+    margin:14px 0 0; color:var(--ink)}
 </style>
 </head>
 <body>
@@ -220,9 +224,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   the web font. Works from a double-click or from GitHub Pages.
 
   To deploy: drop this file in and you are done.
-  To develop: the three <script id="mod-*"> blocks below are the source of
-  truth, and tests/run.js extracts and exercises those exact blocks — so the
-  217 assertions test the code you actually ship, not a parallel copy.
+  To develop: the three script blocks tagged id=mod-load-model, id=mod-units
+  and id=mod-store below are the source of truth. tests/run.js extracts and
+  exercises those exact blocks, so the 217 assertions test the code you ship
+  rather than a parallel copy. Keep those id attributes.
+
+  (Written without angle brackets on purpose — a literal script tag inside this
+  comment confuses anything that scrapes the file for script blocks.)
 
   Layout of this file:
     1. <style>              design tokens, both themes
@@ -392,16 +400,23 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="text" placeholder="$2a$10$…" autocomplete="off" spellcheck="false"></div>
     </div>
     <div class="btnrow">
-      <button type="button" class="primary" id="syncNow">Sync now</button>
+      <button type="button" class="primary" id="testConn">Test connection</button>
+      <button type="button" id="syncNow">Sync now</button>
       <button type="button" id="pullNow">Pull from bin</button>
-      <a href="tools/jsonbin-doctor.html" style="font-size:13.5px">Trouble? Run the sync doctor →</a>
+      <a href="tools/jsonbin-doctor.html" style="font-size:13.5px">Sync doctor →</a>
       <span class="savenote" id="syncNote"></span>
+    </div>
+    <pre id="diag" hidden></pre>
+    <div class="btnrow" id="diagRow" hidden>
+      <button type="button" class="small" id="copyDiag">Copy diagnostics</button>
+      <span class="savenote">No key values are included — safe to paste when asking for help.</span>
     </div>
 
     <div class="callout">
       <h4>If the Access Key is being rejected</h4>
       <p><b>A newly created Access Key has no permissions at all until you grant them</b> — creating the key is not the same as enabling it. In JSONBin go to <b>API Keys</b>, open your key, and tick both <b>Bins Read</b> and <b>Bins Update</b>. The tracker needs both: Read to load the log, Update to save it.</p>
-      <p>If that is already done, open the <a href="tools/jsonbin-doctor.html">sync doctor</a>. It runs the same four calls this page makes and shows the raw HTTP status and JSONBin's exact wording, which distinguishes a permissions problem from a wrong key, a wrong bin, and a blocked request — four things that all surface as "it doesn't work".</p>
+      <p><b>Read and write are separate permissions.</b> With only Bins Read, loading the log works and every save fails — so any test that checks only the read can pass while the app still cannot sync. Press <b>Test connection</b>: it probes both and names which one failed.</p>
+      <p>If <b>Bins Update</b> is genuinely granted and writes are still refused, the cause is probably not the key. The app sends <code>X-Bin-Versioning</code> on writes, and a custom header on a <code>PUT</code> has to survive a CORS preflight; if it does not, the browser blocks the request before it leaves — which looks exactly like a rejected key. <b>The app now retries once without that header automatically</b> and tells you if that is what fixed it. The <a href="tools/jsonbin-doctor.html">sync doctor</a> shows the raw HTTP status and JSONBin's own wording for every call.</p>
     </div>
 
     <div class="subsection">
@@ -1466,11 +1481,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return m ? m[1] : t.replace(/[\r\n\t\s]/g, "");
   }
 
-  function headers(config, forWrite) {
+  // Set once a versioned write is refused but an unversioned one succeeds.
+  // Session-scoped: a wrong guess costs one extra request, not a wrong answer.
+  var noVersioning = false;
+  function versioningDisabled() { return noVersioning; }
+
+  function headers(config, forWrite, skipVersioning) {
     var h = { "X-Access-Key": cleanKey(config.accessKey) };
     if (forWrite) {
       h["Content-Type"] = "application/json";
-      h["X-Bin-Versioning"] = "true";
+      // X-Bin-Versioning is a custom header on a PUT, so it is part of the CORS
+      // preflight. If JSONBin's preflight does not admit it, the browser blocks
+      // the request before it is sent — which looks identical to a rejected key.
+      if (!skipVersioning) h["X-Bin-Versioning"] = "true";
     }
     return h;
   }
@@ -1488,7 +1511,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return fetch(API_ROOT + "/b/" + encodeURIComponent(cleanBinId(config.binId)) +
                  "/latest?meta=false", { method: "GET", headers: headers(config, false) })
       .then(readBody)
-      .then(function (body) { return unpack(body && body.record ? body.record : body); });
+      .then(function (body) { return unpack(body && body.record ? body.record : body); })
+      .catch(function (e) { e.op = e.op || "read"; throw e; });
   }
 
   function remoteWrite(config, doc) {
@@ -1502,10 +1526,27 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         "Log is " + Math.round(size / 1024) + " KB and JSONBin's free tier rejects " +
         "anything over 100 KB. Export CSV, then archive older sessions."));
     }
-    return fetch(API_ROOT + "/b/" + encodeURIComponent(cleanBinId(config.binId)), {
-      method: "PUT", headers: headers(config, true), body: payload
-    }).then(readBody).then(function (body) {
-      return unpack(body && body.record ? body.record : pack(doc));
+    function attempt(skipVersioning) {
+      return fetch(API_ROOT + "/b/" + encodeURIComponent(cleanBinId(config.binId)), {
+        method: "PUT", headers: headers(config, true, skipVersioning), body: payload
+      }).then(readBody).then(function (body) {
+        return unpack(body && body.record ? body.record : pack(doc));
+      }).catch(function (e) { e.op = e.op || "write"; throw e; });
+    }
+
+    if (noVersioning) return attempt(true);
+
+    return attempt(false).catch(function (first) {
+      // These are real and retrying cannot help.
+      if (first.code === "too-large" || first.code === "not-configured") throw first;
+      return attempt(true).then(function (res) {
+        noVersioning = true;
+        return res;
+      }, function () {
+        // The unversioned retry failed too, so the header was not the problem.
+        // Report the first error, which is the informative one.
+        throw first;
+      });
     });
   }
 
@@ -1562,13 +1603,30 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return e;
   }
 
+  /** Raw one-liner for the UI: operation, HTTP status, JSONBin's own wording.
+   *  explain() gives the friendly version; this gives the version you can act
+   *  on or paste to someone else. Hiding it was the reason the app and the
+   *  doctor could disagree without anyone being able to see why. */
+  function detail(e) {
+    if (!e) return "";
+    var bits = [];
+    if (e.op) bits.push(e.op.toUpperCase());
+    if (e.status) bits.push("HTTP " + e.status);
+    if (e.code) bits.push(e.code);
+    var head = bits.length ? "[" + bits.join(" · ") + "] " : "";
+    return head + String(e.message || "").replace(/\s+/g, " ").trim();
+  }
+
   function explain(e) {
     switch (e && e.code) {
       case "not-configured": return "Add your Bin ID and Access Key in Sync settings.";
       case "no-permission":
-        return "The Access Key exists but has no permission for this call. A new " +
-               "Access Key starts with NO permissions — open API Keys in JSONBin and " +
-               "tick both Bins Read and Bins Update on it.";
+        return "The Access Key exists but lacks the permission for this " +
+               (e.op === "write" ? "WRITE. Grant it Bins Update on the API Keys page — " +
+                 "reads can succeed while writes fail, which is why a read-only test looks fine."
+                : e.op === "read" ? "READ. Grant it Bins Read on the API Keys page."
+                : "call. Grant it both Bins Read and Bins Update on the API Keys page.") +
+               " A new Access Key starts with NO permissions at all.";
       case "bad-key":
         return "Access Key rejected. Check you copied the Access Key (not the Master " +
                "Key) with no trailing spaces. Run tools/jsonbin-doctor.html for the exact error.";
@@ -1603,7 +1661,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     loadLocal: loadLocal, saveLocal: saveLocal,
     cleanKey: cleanKey, cleanBinId: cleanBinId,
     configured: configured, remoteRead: remoteRead, remoteWrite: remoteWrite,
-    syncPush: syncPush, explain: explain, codeFor: codeFor
+    syncPush: syncPush, explain: explain, detail: detail, codeFor: codeFor,
+    versioningDisabled: versioningDisabled
   };
 });
 </script>
@@ -1619,8 +1678,25 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   var LM = window.LoadModel, S = window.Store, U = window.Units;
 
   var doc = S.emptyDoc();
-  var config = { binId: "", accessKey: "" };
   var dirty = false;
+
+  /**
+   * Credentials are read from the DOM every time they are needed, never cached.
+   *
+   * The previous version kept a `config` object that the input handler updated.
+   * That works until something sets a field value WITHOUT firing an input event
+   * — a password manager, browser autofill, a programmatic restore — at which
+   * point the screen shows the right key while the object the request uses is
+   * still empty. The app then reports a credential failure whose cause is
+   * invisible, because the visible values are correct. Deriving instead of
+   * caching removes that whole class of bug.
+   */
+  function cfg() {
+    return {
+      binId: S.cleanBinId(($("binId") && $("binId").value) || ""),
+      accessKey: S.cleanKey(($("accessKey") && $("accessKey").value) || "")
+    };
+  }
   var editingId = null;
   var syncing = false;
   var units = "metric";
@@ -1810,19 +1886,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
   function persist() {
     doc.profile = readProfile();
-    S.saveLocal(doc, config, dirty);
+    S.saveLocal(doc, cfg(), dirty);
   }
 
   function pushRemote(reason) {
-    if (!S.configured(config)) { renderSync(); return Promise.resolve(); }
+    if (!S.configured(cfg())) { renderSync(); return Promise.resolve(); }
     if (syncing) return Promise.resolve();
     syncing = true;
     renderSync();
-    return S.syncPush(config, doc).then(function (merged) {
+    return S.syncPush(cfg(), doc).then(function (merged) {
       doc = merged;
       dirty = false;
       adoptProfile();
-      S.saveLocal(doc, config, false);
+      S.saveLocal(doc, cfg(), false);
       syncing = false;
       render();
       say("syncNote", "Synced " + (reason || "") + " · rev " + doc.rev + " · " +
@@ -1830,25 +1906,26 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     }).catch(function (e) {
       syncing = false;
       dirty = true;
-      S.saveLocal(doc, config, true);
+      S.saveLocal(doc, cfg(), true);
       render();
       say("syncNote", S.explain(e), "bad");
+      showDiag(diagnosticsFor(e));
     });
   }
 
   function pullRemote() {
-    if (!S.configured(config)) {
+    if (!S.configured(cfg())) {
       say("syncNote", "Add your Bin ID and Access Key first.", "bad");
       return;
     }
     if (syncing) return;
     syncing = true;
     renderSync();
-    S.remoteRead(config).then(function (remote) {
+    S.remoteRead(cfg()).then(function (remote) {
       doc = S.mergeDocs(doc, remote);
       dirty = false;
       adoptProfile();
-      S.saveLocal(doc, config, false);
+      S.saveLocal(doc, cfg(), false);
       syncing = false;
       render();
       say("syncNote", "Pulled " + S.liveSessions(doc).length +
@@ -1857,6 +1934,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       syncing = false;
       renderSync();
       say("syncNote", S.explain(e), "bad");
+      showDiag(diagnosticsFor(e));
     });
   }
 
@@ -1896,9 +1974,9 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   function renderSync() {
     var tag = $("syncTag");
     var dot = '<span class="dot ' + (syncing ? "pend" :
-      (!S.configured(config) ? "off" : (dirty ? "pend" : "ok"))) + '"></span>';
+      (!S.configured(cfg()) ? "off" : (dirty ? "pend" : "ok"))) + '"></span>';
     var text = syncing ? "Sync: working…"
-      : !S.configured(config) ? "Sync: local only"
+      : !S.configured(cfg()) ? "Sync: local only"
       : dirty ? "Sync: pending changes" : "Sync: up to date";
     tag.innerHTML = dot + text;
   }
@@ -2090,6 +2168,104 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
 
+  // ------------------------------------------------------- connection test --
+
+  function showDiag(text) {
+    $("diag").textContent = text;
+    $("diag").hidden = false;
+    $("diagRow").hidden = false;
+  }
+  function hideDiag() {
+    $("diag").hidden = true;
+    $("diagRow").hidden = true;
+  }
+
+  /** What the app is about to send, masked. Never the key itself. */
+  function credentialReport() {
+    var c = cfg();
+    var lines = [];
+    lines.push("bin id     : " + (c.binId || "(empty)") + "  [" + c.binId.length +
+      " chars, " + (/^[0-9a-f]{24}$/i.test(c.binId) ? "valid shape" : "NOT 24 hex") + "]");
+    lines.push("access key : " + (c.accessKey
+      ? c.accessKey.slice(0, 6) + "\u2026" + c.accessKey.slice(-4) +
+        "  [" + c.accessKey.length + " chars]"
+      : "(empty)"));
+    if (($("binId").value || "") !== c.binId || ($("accessKey").value || "") !== c.accessKey) {
+      lines.push("note       : pasted text held whitespace or a header prefix; the " +
+                 "cleaned values above are what gets sent");
+    }
+    return lines.join("\n");
+  }
+
+  function diagnosticsFor(e) {
+    return ["JSONBin diagnostics \u2014 " + new Date().toISOString(),
+            credentialReport(),
+            "result     : " + S.detail(e),
+            "meaning    : " + S.explain(e)].join("\n");
+  }
+
+  /**
+   * Probe read AND write, and say which one failed.
+   *
+   * Bins Read and Bins Update are separate permissions, so a key can load the
+   * log perfectly and be unable to save it. A read-only check therefore passes
+   * without meaning the app will work — which is exactly how a diagnostic and
+   * the app end up disagreeing.
+   *
+   * The write is non-destructive: it sends the bin's own current contents
+   * straight back, unchanged.
+   */
+  function testConnection() {
+    if (!S.configured(cfg())) {
+      say("syncNote", "Add both a Bin ID and an Access Key first.", "bad");
+      showDiag("JSONBin diagnostics \u2014 " + new Date().toISOString() + "\n" +
+        credentialReport() + "\nresult     : nothing sent, credentials incomplete");
+      return;
+    }
+    var lines = ["JSONBin diagnostics \u2014 " + new Date().toISOString(), credentialReport()];
+    say("syncNote", "Testing read\u2026", "");
+    hideDiag();
+
+    S.remoteRead(cfg()).then(function (remote) {
+      lines.push("read       : OK \u2014 " + S.liveSessions(remote).length +
+                 " session(s) in the bin, rev " + remote.rev);
+      say("syncNote", "Read OK. Testing write\u2026", "");
+      return S.remoteWrite(cfg(), remote).then(function () {
+        if (S.versioningDisabled()) {
+          lines.push("write      : OK, but only after dropping X-Bin-Versioning");
+          lines.push("meaning    : your key is fine. That header was being refused or " +
+                     "blocked by CORS preflight. The app will now omit it.");
+          lines.push("trade-off  : JSONBin will not keep prior versions of the bin, so " +
+                     "Download CSV is your only history backup.");
+          lines.push("verdict    : sync works.");
+          showDiag(lines.join("\n"));
+          say("syncNote", "Connection good. Note: bin versioning had to be turned " +
+              "off — see diagnostics.", "ok");
+        } else {
+          lines.push("write      : OK (with versioning)");
+          lines.push("verdict    : read and write both work \u2014 the app can sync.");
+          showDiag(lines.join("\n"));
+          say("syncNote", "Connection good: read and write both succeed.", "ok");
+        }
+      }, function (e) {
+        lines.push("write      : FAILED \u2014 " + S.detail(e));
+        lines.push("meaning    : " + S.explain(e));
+        lines.push("retried    : also failed without X-Bin-Versioning, so the header " +
+                   "is not the cause");
+        lines.push("verdict    : reads work, writes do not. Grant the Access Key " +
+                   "Bins Update on the JSONBin API Keys page.");
+        showDiag(lines.join("\n"));
+        say("syncNote", "Read works, write is blocked. " + S.explain(e), "bad");
+      });
+    }, function (e) {
+      lines.push("read       : FAILED \u2014 " + S.detail(e));
+      lines.push("meaning    : " + S.explain(e));
+      lines.push("verdict    : the read failed, so nothing was written.");
+      showDiag(lines.join("\n"));
+      say("syncNote", S.explain(e), "bad");
+    });
+  }
+
   // ------------------------------------------------------------------- wire --
 
   function init() {
@@ -2098,13 +2274,9 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var saved = S.loadLocal();
     if (saved) {
       doc = saved.doc;
-      config = {
-        binId: S.cleanBinId(saved.config.binId || ""),
-        accessKey: S.cleanKey(saved.config.accessKey || "")
-      };
       dirty = saved.dirty;
-      $("binId").value = config.binId;
-      $("accessKey").value = config.accessKey;
+      $("binId").value = S.cleanBinId(saved.config.binId || "");
+      $("accessKey").value = S.cleanKey(saved.config.accessKey || "");
     }
 
     var p = S.profileOf(doc);
@@ -2154,6 +2326,15 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     });
     $("syncNow").addEventListener("click", function () { pushRemote("manually"); });
     $("pullNow").addEventListener("click", pullRemote);
+    $("testConn").addEventListener("click", testConnection);
+    $("copyDiag").addEventListener("click", function () {
+      var txt = $("diag").textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(
+          function () { say("syncNote", "Diagnostics copied.", "ok"); },
+          function () { say("syncNote", "Clipboard blocked \u2014 select the text above.", "bad"); });
+      } else { say("syncNote", "Clipboard unavailable \u2014 select the text above.", "bad"); }
+    });
     $("archive").addEventListener("click", function () {
       var cutoff = ($("archiveDate").value || "").trim();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) {
@@ -2174,9 +2355,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var t = ev.target;
     if (t.closest("#logBody") || t.closest("#weekBody")) return;
     if (t.id === "binId" || t.id === "accessKey") {
-      config.binId = S.cleanBinId($("binId").value);
-      config.accessKey = S.cleanKey($("accessKey").value);
-      S.saveLocal(doc, config, dirty);
+      S.saveLocal(doc, cfg(), dirty);
+      // A stale failure message sitting next to freshly pasted credentials is
+      // its own source of confusion. Clear it and drop the old diagnostics.
+      say("syncNote", S.configured(cfg())
+        ? "Saved on this device. Press Test connection."
+        : "Both a Bin ID and an Access Key are needed.", "");
+      hideDiag();
       renderSync();
       return;
     }
