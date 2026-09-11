@@ -396,7 +396,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   <h2>Sync &amp; storage</h2>
   <div class="panel">
     <div class="keyrow">
-      <div class="f"><label for="binId">JSONBin Bin ID</label><input id="binId" type="text" placeholder="24 hex characters, or paste the bin URL" autocomplete="off" spellcheck="false"></div>
+      <div class="f"><label for="binId">JSONBin Bin ID</label><input id="binId" type="text" placeholder="24 hex characters, or paste the bin URL" autocomplete="off" spellcheck="false">
+        <p class="savenote" id="binIdNote" hidden style="margin-top:5px">Set in the file — edit <code>BIN_ID</code> near the top of the app script to change it.</p></div>
       <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="text" placeholder="$2a$10$…" autocomplete="off" spellcheck="false"></div>
     </div>
     <div class="btnrow">
@@ -1677,6 +1678,20 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   "use strict";
   var LM = window.LoadModel, S = window.Store, U = window.Units;
 
+  // ===========================================================================
+  //  EDIT THIS ONE LINE
+  //
+  //  Your Bin ID is an identifier, not a credential — it grants nothing on its
+  //  own — so hard-coding it here is safe and saves retyping it on every device.
+  //  Put your 24-character bin id between the quotes:
+  //
+  var BIN_ID = "";
+  //
+  //  The ACCESS KEY is deliberately NOT here. That one IS sensitive, it would be
+  //  public the moment this file is pushed, and it is entered per device and
+  //  kept only in that browser's local storage.
+  // ===========================================================================
+
   var doc = S.emptyDoc();
   var dirty = false;
 
@@ -1890,7 +1905,16 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   }
 
   function pushRemote(reason) {
-    if (!S.configured(cfg())) { renderSync(); return Promise.resolve(); }
+    if (!S.configured(cfg())) {
+      // Returning silently here made "Sync now" look broken: the click did
+      // nothing visible, so the only reading available was that the button was
+      // dead. A control that declines to act has to say so.
+      renderSync();
+      if (reason === "manually") {
+        say("syncNote", "Nothing to sync to yet — add a Bin ID and Access Key below.", "bad");
+      }
+      return Promise.resolve();
+    }
     if (syncing) return Promise.resolve();
     syncing = true;
     renderSync();
@@ -2279,6 +2303,17 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       $("accessKey").value = S.cleanKey(saved.config.accessKey || "");
     }
 
+    // A hard-coded BIN_ID wins over whatever this browser had stored, so
+    // changing the constant actually takes effect instead of being shadowed by
+    // a stale local value.
+    var hard = S.cleanBinId(BIN_ID);
+    if (hard) {
+      $("binId").value = hard;
+      $("binId").readOnly = true;
+      $("binId").setAttribute("aria-readonly", "true");
+      $("binIdNote").hidden = false;
+    }
+
     var p = S.profileOf(doc);
     units = p.units;
     applyUnitLabels();
@@ -2287,7 +2322,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     refreshLive();
     render();
 
-    if (S.configured(config)) {
+    if (S.configured(cfg())) {
       say("syncNote", "Checking the bin…", "");
       pullRemote();
     } else {
