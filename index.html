@@ -1,1 +1,354 @@
 
+Claude finished the response
+
+Thought process
+Thought process
+GitHub Pages is static-only, which changes two things about your requirements. Let me build the repo, then flag the constraint honestly.
+
+
+Created 2 files, ran a command
+Created 2 files, ran a command
+All 44 tests pass — every number I hand-calculated in the previous turns is now machine-verified, including the Millet race anchor at 998.4 AU and the simplified-vs-segment agreement (0.19% aerobic, 2.08% eccentric).
+
+
+Created 11 files, ran 2 commands, edited a file
+Created 11 files, ran 2 commands, edited a file
+BLUF: Repo is built and verified — 16 files in ultra-load-tracker/ in your outputs folder, no build step, no dependencies, 44/44 tests passing. But GitHub Pages is static hosting with no server, which forces one real architecture decision, and I made it rather than pretending it away.
+
+The constraint you need to decide on
+Pages can't run code or hold a secret. So "log it to a spreadsheet" can't be the app talking to the Sheets API — an API key in a public repo is public the second you push. The workaround is a Google Apps Script Web App: a ~90-line script bound to your own Sheet that accepts a POST and appends a row. Free, no server, the Sheet stays yours. apps-script/Code.gs is written and documented.
+
+  Watch  ──►  index.html  ──►  localStorage        (always works, per-device)
+   5 nums     (browser)    └─► Apps Script ──► Google Sheet ──► analysis tab
+                           └─► CSV export          (the reliable backup)
+The honest catch: Apps Script /exec endpoints don't return CORS headers a browser will let JS read, and a JSON content-type triggers a preflight Apps Script doesn't answer. So the app sends text/plain with mode: "no-cors" — the row lands, but the page cannot confirm it did. Rather than show a green tick it hasn't earned, rows sit at pending until you eyeball the Sheet and click the chip. I'd rather ship that friction than a lying status indicator. Confidence: high on the mechanism, and the health-check GET in step 4 of the setup doc will prove your deployment before you rely on it.
+
+What's in the repo
+lib/load-model.js is the real asset — the formulas as pure, testable functions with no DOM, running identically in the browser and under Node. Both pages consume it. Swap a coefficient in one place and everything follows.
+
+The test suite is the part I'd point at in a portfolio. 44 assertions covering the Minetti polynomials against the values printed in the 2002 paper, both calibration anchors, the Millet race validation, and the simplified-vs-segment agreement. Two results worth noting:
+
+The documented failure mode is asserted. The Minetti walking polynomial is 39% wrong at its −10% minimum. That's pinned as a passing test so it can never silently change.
+An independent cross-check passes. Minetti-derived vertical efficiency is 25.9%; the ACSM walking equation implies 26.1%. Two models sharing no coefficients agreeing to 1% is the strongest validation in the file.
+I also verified the spreadsheet column letters the analysis formulas depend on actually match what the app sends — ael_au → N, ecc_au → O, rpe → L, soreness → M, order aligned, no orphan payload keys.
+
+Deploying
+New public repo → uploading an existing file → drag the contents of ultra-load-tracker in → Settings → Pages → deploy from main / root. Live at https://<username>.github.io/ultra-load-tracker/ in ~2 minutes. All paths are relative so it works at any URL depth. docs/DEPLOY.md has both the no-terminal route and the git route.
+
+One gotcha that catches everyone: make sure index.html lands at repo root, not nested inside another folder. If it nests, Pages serves a directory listing.
+
+Verify with /tests/index.html — it should read 44 passed, 0 failed in green. If it doesn't, something got mangled in upload.
+
+Two things I'd push back on
+Don't wire up Sheets before you've logged for a week. The Apps Script setup is ~10 minutes of Google consent screens and it adds zero accuracy. Get the habit first, use Download CSV as the backup, add sync when local storage starts feeling fragile. Setting up plumbing is a satisfying substitute for doing the actual two weeks.
+
+docs/ANALYSIS.md is the file that matters, not the app. It's the re-fitting procedure — how to tell whether weak Ê-vs-soreness correlation means your step length is wrong, your k_m is wrong, or your soreness logging is inconsistent, and which to touch first. The app just collects numbers. That doc is what turns them into a calibrated model.
+
+I couldn't create the repo for you directly — the GitHub connector failed auth this session (does not support dynamic client registration). Authorize it in your claude.ai connector settings if you want me to push directly next time.
+
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\README.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\index.html
+Code 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\model.html
+Code 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\lib\load-model.js
+ 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\docs\DEPLOY.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\docs\SHEETS-SETUP.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\docs\ANALYSIS.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\apps-script\Code.gs
+ 
+let me ask a different way. i want to have a historical output that i can reference, and i want to be able to enter my metrics into the app once the workout is complete; if we adjusted the backend to primarily be JSONbin, can the app then export data into CSV?
+
+
+Thought process
+Thought process
+Two real questions here — whether JSONBin fixes the confirmation problem (it does) and what it costs you in key exposure (something). Let me verify the specifics rather than assert them.
+
+
+Searched the web, read 2 pages
+Searched the web, read 2 pages
+Verified the API and found one hard constraint worth designing around: free-tier bins cap at 100 KB. Let me build it properly.
+
+
+Created 2 files, ran a command
+Created 2 files, ran a command
+One real failure, and it's a useful one: 294 bytes/session gives only ~347 sessions of headroom — about 1.3 years, not the 2+ I assumed. Fixing the wire format rather than relaxing the test.
+
+
+Edited 6 files, created 5 files, ran 3 commands · 2 notes
+Edited 6 files, created 5 files, ran 3 commands · 2 notes
+BLUF: yes to both, and JSONBin is a strict upgrade over Apps Script. Rebuilt and verified — 116/116 tests passing. CSV export is unaffected by the backend choice (it's pure client-side) and actually gets better, because it now exports your full cross-device history instead of one browser's slice.
+
+JSONBin fixes the thing I flagged last time. Its docs confirm CORS is enabled on all endpoints, so the browser can read responses. That means real confirmation instead of the "pending" chip, plus genuine two-way sync — log on your phone, it's on your laptop. Apps Script could never do that from a static page.
+
+The constraint I found and designed around
+Verified from their docs: free-tier bins are rejected above 100 KB. My first pass cost 294 bytes/session — only ~347 sessions, about 16 months. The capacity test failed, which is what tests are for. Two fixes:
+
+Store inputs, never derived values. AeL/Ê/B̂ don't go in the bin; they're recomputed on every render. Halves record size, and gives you something better: re-fit k_m and the entire history re-prices instantly. There's a test asserting exactly that (k=1.5 → 93.8 AU becomes k=2.0 → 88.5 AU on a stored session). Freezing computed numbers would have made your two-week calibration impossible.
+
+Compact wire format. Short keys, epoch-second timestamps. 190 bytes/session → ~540 sessions, just over two years at 5/week. The app still works in readable field names; packing happens only at the storage boundary. A size meter warns at 80%, and there's archive-by-date with CSV as the permanent record.
+
+What I spent the most care on
+Read-before-write. A bin is one whole JSON document, so a naive save from your phone would silently erase what your laptop added. Every save reads → merges → writes. Union by id, newer edit wins, order-independent.
+
+Tombstones. Delete a session on your laptop, and a union with your phone would resurrect it. Deletes are now soft, with tests asserting survival in both merge orders plus a working undelete. A merge bug doesn't throw — it quietly eats a session — so 72 of the 116 assertions are on this file.
+
+One workflow change you should notice
+I added edit to each row, because your actual pattern is: log the run tonight, add next-day quad soreness tomorrow morning. Without editing, the calibration column you most need would have been unfillable. Editing updates the same record rather than duplicating it.
+
+Honest residual risks
+The Access Key is visible in your browser. Static hosting has nowhere to hide a secret — that's not a JSONBin flaw, it's the architecture. Mitigation: use an Access Key scoped to Bins Read + Update only, never the Master Key (their docs say the Access Key exists precisely for "JavaScript apps where your source is sensitive and open"). Blast radius if it leaks is one training log, and versioning is on for every write so you can restore. If that trade is unacceptable, the real answer is a small server — not a cleverer static trick.
+
+Requests: 10,000, credited once, never expiring. Your usage runs ~1,500/year. The app never polls — deliberate, to protect that budget. Press Pull from bin to check another device.
+
+Two smaller notes: I made a product call to drop the Apps Script sync path — CSV → File→Import in Sheets gets you identical analysis with zero setup, and maintaining two sync backends for a personal tool isn't worth it. I couldn't delete apps-script/ and docs/SHEETS-SETUP.md (sandbox denied file removal), so they're marked superseded — delete both yourself for a lean repo. And the GitHub connector still isn't authorized, so you'll push manually per docs/DEPLOY.md.
+
+Sources: Read Bins API · Update Bins API · Access Keys · Pricing
+
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\index.html
+Code 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\docs\JSONBIN-SETUP.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\lib\store.js
+ 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\tests\store.test.js
+ 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\README.md
+Document 
+
+C:\Users\DomRafiti\AppData\Roaming\Claude\local-agent-mode-sessions\755e6576-be1a-4bcd-bab8-2f92860a8d1b\0432aad6-ae84-4db7-bf64-8ae8b45fba43\local_45db465e-0359-4dd1-8769-430444d73951\outputs\ultra-load-tracker\docs\DEPLOY.md
+Document 
+
+
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+
+
+Index · HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load Log — Two-Channel Ultra Load Tracker</title>
+<meta name="description" content="Log a mountain run from five watch numbers, get aerobic and eccentric load, keep the history in JSONBin, export to CSV.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  /* page-specific: sync panel, storage meter, edit state */
+  .szmeter{height:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:3px; overflow:hidden; margin:9px 0 7px}
+  .szmeter div{height:100%; background:var(--aero); width:0}
+  tr.editing td{background:var(--aero-soft)}
+  .del.ed{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em}
+  .del.ed:hover{color:var(--aero)}
+  .banner{background:var(--aero-soft); border-left:3px solid var(--aero); padding:10px 14px;
+    border-radius:0 3px 3px 0; font-size:14px; margin-bottom:14px}
+  .keyrow{display:grid; grid-template-columns:1fr 1.4fr; gap:12px}
+  @media(max-width:700px){.keyrow{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ 
+<nav class="top">
+  <a href="index.html" aria-current="page">Load Log</a>
+  <a href="model.html">The Model</a>
+  <a href="tests/index.html">Tests</a>
+  <span class="sp"></span>
+  <a href="docs/JSONBIN-SETUP.md">Sync setup</a>
+</nav>
+ 
+<header class="mast">
+  <div class="kicker">Two-channel ultra load tracker · daily instrument</div>
+  <h1>Load Log</h1>
+  <p class="standfirst">Enter five numbers after a run — duration, average heart rate, distance, ascent, descent — and get both load values. History lives in your JSONBin bin, so every device sees the same log, and exports to CSV whenever you want it elsewhere.</p>
+  <div class="meta">
+    <span class="tag" id="syncTag">Sync: local only</span>
+    <span class="tag">Stores inputs, derives outputs</span>
+    <span class="tag">CSV + JSON export</span>
+  </div>
+</header>
+ 
+<section id="entry" style="margin-top:0">
+  <h2>Log a session</h2>
+  <div class="panel">
+    <div class="banner" id="editBanner" hidden>Editing an existing session — the same row will be updated, not duplicated.</div>
+    <div class="corefields">
+      <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
+      <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" value="120" step="1" min="1"></div>
+      <div class="f"><label for="hr">Avg HR <span class="sublab">bpm</span></label><input id="hr" type="number" value="145" step="1" min="1"></div>
+      <div class="f"><label for="dist">Distance <span class="sublab">km</span></label><input id="dist" type="number" value="16" step="0.1" min="0"></div>
+      <div class="f"><label for="up">Ascent <span class="sublab">m D+</span></label><input id="up" type="number" value="900" step="10" min="0"></div>
+      <div class="f"><label for="down">Descent <span class="sublab">m D−</span></label><input id="down" type="number" value="900" step="10" min="0"></div>
+    </div>
+    <div class="f" style="margin-top:12px"><label for="label">Session label</label><input id="label" type="text" class="serif" placeholder="Morning trail loop"></div>
+ 
+    <div class="subsection">
+      <div class="hdr">
+        <span class="disp">Optional</span>
+        <span>the first two unlock B̂ · soreness is filled in the next morning using <b>edit</b></span>
+      </div>
+      <div class="gridauto">
+        <div class="f"><label for="dmin">Descent time <span class="sublab">min</span></label><input id="dmin" type="number" placeholder="—" step="1" min="0"></div>
+        <div class="f"><label for="umin">Climb time <span class="sublab">min</span></label><input id="umin" type="number" placeholder="—" step="1" min="0"></div>
+        <div class="f"><label for="cad">Descent cadence <span class="sublab">spm</span></label><input id="cad" type="number" placeholder="176" step="1" min="0"></div>
+        <div class="f"><label for="pack">Pack <span class="sublab">kg</span></label><input id="pack" type="number" value="0" step="0.5" min="0"></div>
+        <div class="f"><label for="rpe">RPE <span class="sublab">0–10</span></label><input id="rpe" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
+        <div class="f"><label for="sore">Quad soreness <span class="sublab">next day, 0–10</span></label><input id="sore" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
+      </div>
+    </div>
+ 
+    <div class="readout">
+      <div class="ro a"><div class="k">Aerobic load</div><div class="v tnum" id="oAeL">—</div><div class="u">AeL · AU</div></div>
+      <div class="ro m"><div class="k">Eccentric load</div><div class="v tnum" id="oE">—</div><div class="u">Ê · AU</div></div>
+      <div class="ro m"><div class="k">Cyclic load</div><div class="v tnum" id="oB">—</div><div class="u" id="oBu">B̂ · needs time split</div></div>
+      <div class="ro"><div class="k">Mean descent grade</div><div class="v tnum" id="oG">—</div><div class="u">% · derived</div></div>
+      <div class="ro"><div class="k">Intensity</div><div class="v tnum" id="oF">—</div><div class="u">% HR reserve</div></div>
+    </div>
+ 
+    <div class="btnrow">
+      <button type="button" class="primary" id="save">Add to log</button>
+      <button type="button" id="cancelEdit" hidden>Cancel edit</button>
+      <button type="button" id="dlCsv">Download CSV</button>
+      <button type="button" id="copyCsv">Copy CSV</button>
+      <button type="button" id="dlJson">Download raw JSON</button>
+      <span class="savenote" id="note"></span>
+    </div>
+  </div>
+</section>
+ 
+<section id="log">
+  <h2>Session history</h2>
+  <div class="tblwrap">
+    <table class="log">
+      <thead><tr>
+        <th>Date</th><th>Session</th><th>min</th><th>HR</th><th>km</th><th>D+</th><th>D−</th>
+        <th>AeL</th><th>Ê</th><th>B̂</th><th>RPE</th><th>Sore</th><th></th><th></th>
+      </tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+    <div class="empty" id="logEmpty">No sessions yet. Fill in the five fields above and press <b>Add to log</b>.</div>
+  </div>
+  <p class="savenote" style="margin-top:10px">AeL, Ê and B̂ are not stored — they are recomputed from your profile every time this table renders. Change <code>k<sub>m</sub></code> or your descent step length and the whole history corrects itself.</p>
+ 
+  <div class="rolling">
+    <div class="rcard a"><div class="k">AeL · last 7 days</div><div class="v" id="r7a">—</div><div class="n" id="r7an">—</div></div>
+    <div class="rcard m"><div class="k">Ê · last 7 days</div><div class="v" id="r7m">—</div><div class="n" id="r7mn">—</div></div>
+    <div class="rcard a"><div class="k">AeL · days 8–14</div><div class="v" id="p7a">—</div><div class="n">prior week</div></div>
+    <div class="rcard m"><div class="k">Ê · days 8–14</div><div class="v" id="p7m">—</div><div class="n">prior week</div></div>
+  </div>
+</section>
+ 
+<section id="weeks">
+  <h2>Weekly rollup</h2>
+  <p class="lede">The historical reference view. Weeks start Monday. <b>Divergence</b> is Ê ÷ AeL — rising means your training is turning descent-dominant, falling means you are accumulating aerobic work without mechanical specificity.</p>
+  <div class="tblwrap">
+    <table class="log">
+      <thead><tr>
+        <th>Week of</th><th>Sessions</th><th>Hours</th><th>km</th><th>D+</th><th>D−</th>
+        <th>AeL</th><th>Ê</th><th>Divergence</th><th>Mean RPE</th><th>Mean sore</th>
+      </tr></thead>
+      <tbody id="weekBody"></tbody>
+    </table>
+    <div class="empty" id="weekEmpty">Log a session to start the weekly history.</div>
+  </div>
+</section>
+ 
+<section id="calib">
+  <h2>Calibrating to you</h2>
+  <p class="lede">Two coefficients in the model are assumptions rather than measurements. These correlations are how you find out whether they fit you. Full procedure in <a href="docs/ANALYSIS.md">docs/ANALYSIS.md</a>.</p>
+  <div class="rolling">
+    <div class="rcard m"><div class="k">Ê vs next-day soreness</div><div class="v" id="cSore">—</div><div class="n" id="cSoreN">needs 5+ scored sessions</div></div>
+    <div class="rcard a"><div class="k">AeL vs RPE</div><div class="v" id="cRpe">—</div><div class="n" id="cRpeN">needs 5+ scored sessions</div></div>
+  </div>
+  <div class="callout">
+    <h4>How to read these</h4>
+    <p>A strong positive correlation for <b>Ê vs soreness</b> means the eccentric channel is tracking your actual tissue response. A weak one points at <code>k<sub>m</sub></code> or your descent step length, not at the descent metres — those are measured, the other two are assumed. Adjust one at a time below and watch the correlation move; because nothing derived is stored, the entire history re-prices instantly.</p>
+    <p><b>AeL vs RPE</b> should be strong for continuous sessions. If it is weak specifically on interval days, that is expected and quantified: average heart rate under-counts a session with high intensity spread by roughly 1.843·σ²<sub>F</sub>, about 7&nbsp;% at σ<sub>F</sub>&nbsp;=&nbsp;0.20. Log intervals and the rest of the run as two entries.</p>
+  </div>
+</section>
+ 
+<section id="profile">
+  <h2>Profile</h2>
+  <div class="panel">
+    <div class="gridauto">
+      <div class="f"><label for="mBody">Body mass <span class="sublab">kg</span></label><input id="mBody" type="number" value="70" step="0.5" min="20"></div>
+      <div class="f"><label for="sex">Sex <span class="sublab">TRIMP constants</span></label><select id="sex"><option value="m">male</option><option value="f">female</option></select></div>
+      <div class="f"><label for="hrMax">HR max</label><input id="hrMax" type="number" value="188" min="100"></div>
+      <div class="f"><label for="hrRest">HR rest</label><input id="hrRest" type="number" value="46" min="25"></div>
+      <div class="f"><label for="sl">Descent step length <span class="sublab">m</span></label><input id="sl" type="number" value="1.05" step="0.05" min="0.4"></div>
+      <div class="f"><label for="km">k<sub>m</sub> <span class="sublab">muscle exponent</span></label><input id="km" type="number" value="1.5" step="0.25" min="1" max="2.5"></div>
+      <div class="f"><label for="kb">k<sub>b</sub> <span class="sublab">bone exponent</span></label><input id="kb" type="number" value="3" step="0.5" min="1" max="6"></div>
+    </div>
+    <p class="savenote" style="margin-top:12px">The profile travels with the log, so a new device picks up your settings on first sync.</p>
+  </div>
+</section>
+ 
+<section id="sync">
+  <h2>Sync &amp; storage</h2>
+  <div class="panel">
+    <div class="keyrow">
+      <div class="f"><label for="binId">JSONBin Bin ID</label><input id="binId" type="text" placeholder="68b1…"></div>
+      <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="password" placeholder="$2a$10$…" autocomplete="off"></div>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="primary" id="syncNow">Sync now</button>
+      <button type="button" id="pullNow">Pull from bin</button>
+      <span class="savenote" id="syncNote"></span>
+    </div>
+ 
+    <div class="subsection">
+      <div class="hdr"><span class="disp">Bin size</span><span>JSONBin's free tier rejects any bin over 100 KB</span></div>
+      <div class="szmeter"><div id="szBar"></div></div>
+      <p class="savenote"><span id="szBytes">0</span> KB used · <span id="szPct">0</span>&nbsp;% of cap · room for about <span id="szRoom">—</span> more sessions</p>
+      <p class="savenote bad" id="szWarn" hidden></p>
+      <div class="keyrow" style="margin-top:12px">
+        <div class="f"><label for="archiveDate">Archive sessions before</label><input id="archiveDate" type="date"></div>
+        <div class="f" style="display:flex; align-items:flex-end"><button type="button" id="archive">Trim log to this cutoff</button></div>
+      </div>
+      <p class="savenote">Download CSV first — archiving is not reversible from inside the app. Bin versioning is enabled on every write, so JSONBin also keeps up to 1000 prior versions you can restore from its dashboard.</p>
+    </div>
+ 
+    <div class="callout">
+      <h4>What the Access Key does and does not protect</h4>
+      <p>This is a static site, so the key you paste lives in your browser's local storage and is visible to anyone with your browser or devtools. That is why it must be an <b>Access Key</b> scoped to <b>Bins Read + Bins Update</b> — never your Master Key, which can create and delete every bin on your account. Someone who extracted this key could read or overwrite this one training log. For a personal training log that is an acceptable trade; do not put anything else in the bin. Setup walkthrough: <a href="docs/JSONBIN-SETUP.md">docs/JSONBIN-SETUP.md</a>.</p>
+    </div>
+  </div>
+</section>
+ 
+<footer>
+  Model derivation, coefficient provenance and the evidence ledger are in <a href="model.html">The Model</a>. Formulas live in <code>lib/load-model.js</code>, storage in <code>lib/store.js</code>, both asserted in <a href="tests/index.html">tests</a>. Not medical advice — a load model does not replace judgement about pain, injury or illness.
+</footer>
+ 
+</div>
+ 
+<script src="lib/load-model.js"></script>
+<script src="lib/store.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
+ 
+
