@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Model — Two-Channel Ultra Load Tracker</title>
+<meta name="description" content="Derivation, calibration and evidence ledger for the two-channel aerobic and mechanical load equations.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="top">
+  <a href="index.html">Load Log</a>
+  <a href="model.html" aria-current="page">The Model</a>
+  <a href="tests/index.html">Tests</a>
+  <span class="sp"></span>
+  <a href="docs/JSONBIN-SETUP.md">Sync setup</a>
+</nav>
+
+<header class="mast">
+  <div class="kicker">Training-load methodology · mountain &amp; ultra endurance</div>
+  <h1>Two-Channel Ultra Load Model</h1>
+  <p class="standfirst">Mountain running loads the body along two axes that do not move together: the oxygen cost of climbing, and the eccentric cost of descending. One number cannot hold both. These are two equations — <b>AeL</b> for aerobic dose, <b>MechL</b> for mechanical dose — with every coefficient traced to a source or flagged as an assumption.</p>
+  <div class="meta">
+    <span class="tag">Terrain-aware</span>
+    <span class="tag">Watch-data computable</span>
+    <span class="tag">Anchored to Minetti 2002</span>
+    <span class="tag">Validated vs. Millet 2011</span>
+    <span class="tag">44 assertions, 0 failing</span>
+  </div>
+</header>
+
+<section id="equations" style="margin-top:0">
+  <h2>The two equations</h2>
+  <div class="channels">
+
+    <div class="chan a">
+      <div class="lbl">Channel 1 · Internal / cardiorespiratory</div>
+      <h3>Aerobic Load — AeL</h3>
+      <p class="sub">Dose to the oxygen-transport and metabolic systems. One hour at 50&nbsp;% heart-rate reserve ≈ 100&nbsp;AU.</p>
+      <div class="eq nowrap">AeL = <b>Σ</b><sub>t</sub> Δt · w(F<sub>t</sub>) · δ(t)</div>
+      <div class="where">
+        <dl>
+          <dt>w(F)</dt><dd>0.64·e<sup>1.92F</sup> (male) · 0.86·e<sup>1.67F</sup> (female) — Banister TRIMP weighting, fitted to the ΔHR–blood-lactate relation</dd>
+          <dt>F</dt><dd>fractional reserve intensity, 0–1</dd>
+          <dt>δ(t)</dt><dd>min(1 + 0.035·max(0, (t−90)/60), 1.30) — durability up-weight, t = elapsed minutes</dd>
+        </dl>
+      </div>
+      <h4>Tier A — heart rate available</h4>
+      <div class="eq">F<sub>t</sub> = (HR<sub>t</sub> − HR<sub>rest</sub>) / (HR<sub>max</sub> − HR<sub>rest</sub>)</div>
+      <h4>Tier B — terrain-derived, no HR needed</h4>
+      <div class="eq">V̇O₂<sub>t</sub> = 60 · (m<sub>tot</sub>/m<sub>body</sub>) · C(i<sub>t</sub>) · v<sub>t</sub> / 20.9<br>
+        F<sub>t</sub> = V̇O₂<sub>t</sub> / (V̇O₂max<sub>alt</sub> − 3.5)<br>
+        V̇O₂max<sub>alt</sub> = V̇O₂max · (1 − 0.065 · max(0, (h−1500)/1000))</div>
+      <p class="where" style="margin-top:12px">C(i) is the Minetti gradient cost polynomial, running form below +20&nbsp;% grade and walking form above it. Minetti's costs are net of resting metabolism, so the −3.5 makes F a <b>reserve</b> ratio — which is what licenses feeding it into a weighting fitted to %HRR, since %V̇O₂R ≈ %HRR.</p>
+    </div>
+
+    <div class="chan m">
+      <div class="lbl">Channel 2 · External / tissue</div>
+      <h3>Mechanical Load — MechL</h3>
+      <p class="sub">Dose to muscle, tendon and bone. Scaled so 100&nbsp;AU = the canonical muscle-damaging downhill protocol.</p>
+      <div class="eq nowrap">MechL = 100 · [ (1−ω)·<b>Ê</b> + ω·<b>B̂</b> ] · κ<sub>p</sub> · κ<sub>s</sub></div>
+      <h4>Eccentric channel Ê — muscle damage</h4>
+      <div class="eq">Ê = ( Σ<sub>j</sub> N<sub>j</sub> · u<sub>j</sub><sup>k<sub>m</sub></sup> ) / E<sub>ref</sub><br>
+        u<sub>j</sub> = m<sub>tot</sub> · g · h⁻<sub>j</sub> / N<sub>j</sub></div>
+      <h4>Cyclic channel B̂ — bone &amp; tendon</h4>
+      <div class="eq">B̂ = ( Σ<sub>j</sub> N<sub>j</sub> · [ (v<sub>j</sub>/v<sub>ref</sub>)<sup>1.13</sup> · γ(i<sub>j</sub>) ]<sup>k<sub>b</sub></sup> ) / B<sub>ref</sub></div>
+      <div class="where">
+        <dl>
+          <dt>N<sub>j</sub></dt><dd>steps in segment = cadence × duration</dd>
+          <dt>h⁻<sub>j</sub></dt><dd>descent in segment; climbs contribute 0 to Ê</dd>
+          <dt>m<sub>tot</sub></dt><dd>body mass + carried mass; g = 9.81</dd>
+          <dt>k<sub>m</sub>, k<sub>b</sub></dt><dd>damage exponents — 1.5 and 3.0 by default</dd>
+          <dt>γ(i)</dt><dd>1.2 descending · 1.0 level · 0.7 climbing</dd>
+          <dt>ω</dt><dd>0 = pure muscle view, 1 = pure bone view</dd>
+        </dl>
+      </div>
+      <p class="where" style="margin-top:12px"><b>Report Ê and B̂ separately whenever you can.</b> Blending them is a convenience, not a physiological claim.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h4>The one rule that keeps this honest</h4>
+    <p><b>Never add AeL and MechL.</b> They are a coordinate pair, not a total. A 3-hour flat tempo is high-aerobic / low-mechanical. A slow 2000&nbsp;m descent is low-aerobic / very-high-mechanical. Collapsing them is exactly the error that lets a coach load a runner into a stress fracture while the training-load chart stays green.</p>
+  </div>
+</section>
+
+<section id="simplified">
+  <h2>The whole-session shortcut</h2>
+  <p class="lede">The daily <a href="index.html">Load Log</a> does not ask for segments, and it does not need to. Both collapses are quantified, and both are asserted in the test suite.</p>
+  <div class="two">
+    <div>
+      <h3>Eccentric — exactly equivalent, not approximate</h3>
+      <div class="eq">Ê = 0.303 · D⁻ · (m<sub>tot</sub>/70)<sup>1.5</sup> · √(ī · SL)</div>
+      <p style="margin-top:13px">At k<sub>m</sub> = 1.5 the segment sum collapses algebraically: Σ N·(mgh/N)<sup>1.5</sup> becomes (mg)<sup>1.5</sup>·D⁻·√(ī·SL). Descent metres enter <b>linearly</b>; mean grade and step length only under a square root, so a 20&nbsp;% error in either moves Ê by 10&nbsp;%.</p>
+      <p>ī is derived from what a watch already gives you: distance is split between climbing and descending in proportion to D+ and D−. On the worked example that recovers 0.160 against a true weighted 0.169 — a 5&nbsp;% grade error, so a 2.1&nbsp;% load error.</p>
+      <h4>The number to carry in your head</h4>
+      <p>At 70&nbsp;kg on 12&nbsp;% mean descent grade: <b>≈ 10.8 AU per 100&nbsp;m of descent.</b> At 20&nbsp;%: 13.9. At 30&nbsp;%: 17.0. You can price a route off the elevation profile before you leave the house.</p>
+    </div>
+    <div>
+      <h3>Aerobic — no approximation worth worrying about</h3>
+      <div class="eq">AeL = w(F̄) · I(T)</div>
+      <p style="margin-top:13px">I(T) is the durability integral ∫δ(t)dt in closed form, so exactness is free:</p>
+      <div class="eq">T ≤ 90 → I = T<br>
+        90 &lt; T ≤ 604.3 → I = T + 0.00029167·(T−90)²<br>
+        T &gt; 604.3 → I = 681.45 + 1.30·(T−604.3)</div>
+      <p style="margin-top:13px">Using one average through a convex weighting under-counts by roughly <b>1.843·σ²<sub>F</sub></b>. Continuous mountain running sits at σ<sub>F</sub> ≈ 0.05–0.12, a 0.5–2.7&nbsp;% under-count. Interval sessions reach σ<sub>F</sub> ≈ 0.20 and a 7&nbsp;% under-count — log the intervals and the rest as two entries.</p>
+      <div class="callout" style="margin-top:16px">
+        <h4>B̂ is the one casualty</h4>
+        <p>Its effective speed exponent is 3.39. Averaging a 4&nbsp;km/h hike with an 11&nbsp;km/h descent under-counts by more than half. The Log shows a dash unless you supply climb and descent minutes — a fabricated B̂ is worse than no B̂.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="calc">
+  <h2>Segment calculator</h2>
+  <p class="lede">The full form, for when you do have splits. Edit any cell. Loaded with a Brévent-style loop above Chamonix — 21&nbsp;km, 1706&nbsp;m D+, 1656&nbsp;m D− — as an example, not your data.</p>
+  <div class="panel">
+    <div class="gridauto" style="margin-bottom:18px">
+      <div class="f"><label for="mBody">Body mass kg</label><input id="mBody" type="number" value="70" step="0.5"></div>
+      <div class="f"><label for="mPack">Pack kg</label><input id="mPack" type="number" value="3" step="0.5"></div>
+      <div class="f"><label for="sex">Sex</label><select id="sex"><option value="m">male</option><option value="f">female</option></select></div>
+      <div class="f"><label for="hrMax">HR max</label><input id="hrMax" type="number" value="188"></div>
+      <div class="f"><label for="hrRest">HR rest</label><input id="hrRest" type="number" value="46"></div>
+      <div class="f"><label for="vo2">V̇O₂max</label><input id="vo2" type="number" value="62" step="0.5"></div>
+      <div class="f"><label for="alt">Mean alt m</label><input id="alt" type="number" value="1900" step="50"></div>
+    </div>
+    <div class="tblwrap">
+      <table class="data" id="segTable">
+        <thead><tr>
+          <th>Segment</th><th>Dist km</th><th>Grade %</th><th>Speed km/h</th><th>Cad spm</th><th>HR bpm</th>
+          <th>Time min</th><th>D± m</th><th>AeL</th><th>Ê AU</th>
+        </tr></thead>
+        <tbody id="segBody"></tbody>
+      </table>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="small" id="addRow">Add segment</button>
+      <button type="button" class="small" id="delRow">Remove last</button>
+      <button type="button" class="small" id="reset">Reload example</button>
+    </div>
+    <div class="subsection">
+      <div class="gridauto">
+        <div class="f"><label for="tier">Aerobic tier</label><select id="tier">
+          <option value="A">A — heart rate</option><option value="B">B — terrain</option></select></div>
+        <div class="f"><label for="km">k<sub>m</sub></label><input id="km" type="number" value="1.5" step="0.25" min="1" max="2.5"></div>
+      </div>
+    </div>
+    <div class="readout">
+      <div class="ro a"><div class="k">Aerobic load</div><div class="v tnum" id="oAeL">—</div><div class="u">AU · <span id="oTier">tier A</span></div></div>
+      <div class="ro m"><div class="k">Eccentric Ê</div><div class="v tnum" id="oE">—</div><div class="u">AU</div></div>
+      <div class="ro"><div class="k">Moving time</div><div class="v tnum" id="oT">—</div><div class="u">h:mm</div></div>
+      <div class="ro"><div class="k">Vertical</div><div class="v tnum" id="oV">—</div><div class="u">m D+ / D−</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="curve">
+  <h2>Why gradient has to be in the equation</h2>
+  <p class="lede">The metabolic cost of covering a metre is not linear in grade, and it is not symmetric. Descending gets cheaper down to about −20&nbsp;%, then expensive again — while the mechanical cost climbs monotonically the whole way down. Any model that treats a kilometre as a kilometre is wrong by a factor of five at the ends of this curve.</p>
+  <div class="chartbox">
+    <svg id="minetti" viewBox="0 0 760 340" width="100%" height="340" role="img" aria-label="Energy cost of running and walking against gradient from minus 45 to plus 45 percent"></svg>
+    <div class="legend">
+      <span><i style="background:var(--aero)"></i>Running C<sub>r</sub>(i)</span>
+      <span><i style="background:var(--mech)"></i>Walking C<sub>w</sub>(i)</span>
+      <span><i style="background:var(--muted); height:2px"></i>Level running reference, 3.6 J·kg⁻¹·m⁻¹</span>
+    </div>
+  </div>
+  <p style="margin-top:14px; font-size:14.5px; color:var(--muted)">Minetti et al. (2002). Running: C<sub>r</sub> = 155.4i⁵ − 30.4i⁴ − 43.3i³ + 46.3i² + 19.5i + 3.6. Walking: C<sub>w</sub> = 280.5i⁵ − 58.7i⁴ − 76.8i³ + 51.9i² + 19.6i + 2.5. Above roughly +25&nbsp;% grade the walking curve sits below the running curve — the physiological reason mountain athletes hike steep climbs.</p>
+</section>
+
+<section id="derivation">
+  <h2>Derivation notes</h2>
+  <div class="two">
+    <div>
+      <h3>The durability term δ(t)</h3>
+      <p>This makes the equation ultra-specific, and it is the piece I am least willing to defend to three decimals.</p>
+      <p>Threshold intensities migrate downward during long efforts. Hunter's London Marathon cohort lost 5.5&nbsp;% of speed at lactate threshold after 90 minutes. Hamilton's cyclists lost 6&nbsp;% of power at VT1 after 150 minutes. Both mean the same thing: <b>at hour four, a given heart rate represents a higher fraction of your current capacity than it did at minute ten.</b> Flat TRIMP integration silently under-prices the back half of every long day.</p>
+      <p>Those imply 3.7&nbsp;%/h and 2.4&nbsp;%/h. I took 3.5&nbsp;%/h with onset at 90 minutes, because both protocols were ≥90 min. The 1.30 cap is an <span class="pill as">assumption</span> — decay almost certainly plateaus, but nothing quantifies where. It binds at ~10 hours and adds ~12.6&nbsp;% to a 10-hour effort versus naïve TRIMP.</p>
+      <h4>What I deliberately left out</h4>
+      <p><b>No heat multiplier in Tier A.</b> Heat raises heart rate directly — Rosbrook found +23&nbsp;bpm of drift over 90&nbsp;min at 37&nbsp;°C versus +10 at 20&nbsp;°C. Integrating measured HR already captures it; a heat coefficient would double-count.</p>
+      <p><b>No altitude multiplier either</b> — the altitude term shrinks V̇O₂max in the denominator instead, which is mechanistically what happens.</p>
+    </div>
+    <div>
+      <h3>Start from negative work, not impact</h3>
+      <p>The obvious move is accelerometry — impact g, GRF, "player load". Matijevich is the reason not to. Across speeds and slopes, GRF metrics were <b>not</b> correlated with tibial compression: impact peak versus peak tibial load came out at r&nbsp;=&nbsp;−0.29&nbsp;±&nbsp;0.37, and 76 of 80 subject-specific correlations showed higher GRF did not mean higher bone load. Wearable "impact load" scores measure the wrong thing.</p>
+      <p>So: descending ΔH metres, the body absorbs m·g·ΔH joules of negative work — 9.81&nbsp;J per kg per metre, no fitting required. Minetti's finding that efficiency below −15&nbsp;% grade approaches that of pure eccentric contraction licenses treating descent as the eccentric channel.</p>
+      <p>Damage then accumulates as <span class="mono">cycles × magnitude<sup>k</sup></span>, the structure of a bone S–N curve. <span class="pill as">Assumption</span> k<sub>m</sub> = 1.5 is not measured — no published dose–response exponent for eccentric running damage exists that I found. It sits above 1 (superlinear, as all fatigue processes are) and well below the 4–12 of cortical-bone strain-life curves.</p>
+      <div class="callout">
+        <h4>Adaptation is a response, not a dose</h4>
+        <p>The repeated-bout effect is real and large, and it is tempting to bolt an RBE discount onto MechL. Don't. A 1500&nbsp;m descent delivers the same mechanical stimulus whether or not you are adapted; what changes is your damage response. Keep MechL as pure dose and apply ρ<sub>RBE</sub> ∈ [0.7, 1.0] on the tolerance side. Bontemps sharpens this: ten downhill sessions reduced soreness but did <b>not</b> change central or peripheral fatigue response — "adapted" is not one number.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="calibration">
+  <h2>Calibration &amp; validation</h2>
+  <h3>Where 100 AU comes from</h3>
+  <p>Bontemps' review characterised the literature's canonical muscle-damaging bout by its medians: <b>−12&nbsp;% grade, 40 minutes, 11.3&nbsp;km/h</b>. For a 70&nbsp;kg athlete that is 7533&nbsp;m of distance, 904&nbsp;m of descent, 6800 steps at 170&nbsp;spm, 621&nbsp;kJ of negative work, 91.29&nbsp;J per step. Defining it as <b>Ê = 100 AU</b> makes every number a multiple of a protocol the literature agrees causes measurable damage. B<sub>ref</sub> is a flat 10&nbsp;km at 12&nbsp;km/h — 8750 steps — likewise <b>B̂ = 100 AU</b>.</p>
+
+  <h3>Does the scale behave?</h3>
+  <table class="t2">
+    <thead><tr><th>Session</th><th>Steps</th><th>J/step</th><th>Ê</th><th>Reads as</th></tr></thead>
+    <tbody>
+      <tr><td>Reference EIMD bout</td><td class="num">6 800</td><td class="num">91.3</td><td class="num">100.0</td><td>by definition</td></tr>
+      <tr><td>Flat 10 km, 12 km/h</td><td class="num">8 750</td><td class="num">0</td><td class="num">0</td><td>correctly zero — B̂ = 100 instead</td></tr>
+      <tr><td>Descent workout, 1000 m at −20 %</td><td class="num">4 545</td><td class="num">151.1</td><td class="num">142.3</td><td>1.4× the damaging protocol in 25 min</td></tr>
+      <tr><td>Mountain long day, 1500 m at −18.75 %</td><td class="num">7 778</td><td class="num">132.4</td><td class="num">199.8</td><td>2× — a genuine recovery cost</td></tr>
+      <tr><td><b>Millet 2011: 166 km MUM, 9500 m D−</b></td><td class="num">79 167</td><td class="num">82.4</td><td class="num">998.4</td><td><b>10× the canonical bout</b></td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:16px">That last row is the validation that matters. Millet's cohort finished with knee-extensor MVC down 35&nbsp;%, creatine kinase from 144 to 13 633&nbsp;UI·L⁻¹, and 16 days to baseline. The model prices it at ten canonical damaging protocols back to back.</p>
+  <p>It also produces a non-obvious insight: <b>per-step load in the race (82.4&nbsp;J) is lower than in the reference protocol (91.3&nbsp;J)</b>. Ultra runners descend with short, soft, high-cadence steps. Their damage comes almost entirely from cycle count, not per-cycle severity — a real argument for treating descent volume and descent intensity as separate training variables.</p>
+
+  <h3>Sensitivity to the exponent I guessed</h3>
+  <table class="t2">
+    <thead><tr><th>k<sub>m</sub></th><th>166 km race, Ê</th><th>Steep descent workout, Ê</th></tr></thead>
+    <tbody>
+      <tr><td>1.00</td><td class="num">1 050.9</td><td class="num">110.6</td></tr>
+      <tr><td>1.25</td><td class="num">1 024.3</td><td class="num">126.0</td></tr>
+      <tr><td><b>1.50</b></td><td class="num">998.4</td><td class="num">142.3</td></tr>
+      <tr><td>1.75</td><td class="num">973.1</td><td class="num">161.8</td></tr>
+      <tr><td>2.00</td><td class="num">948.6</td><td class="num">183.1</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:16px">The race moves ±5&nbsp;% across the whole plausible range; the steep workout moves ±28&nbsp;%. <b>The exponent only matters when per-step severity departs from the calibration point</b> — so the model is robust where mountain athletes spend most of their time and uncertain exactly where they do their hardest specific work.</p>
+</section>
+
+<section id="ledger">
+  <h2>Evidence ledger</h2>
+  <p class="lede">Every coefficient and what it rests on. <span class="pill ev">measured</span> comes from a cited result. <span class="pill der">derived</span> is arithmetic on cited results. <span class="pill as">assumed</span> is judgement — re-fit these first against your own data.</p>
+  <table class="t2">
+    <thead><tr><th>Term</th><th>Value</th><th>Status</th><th>Basis &amp; caveat</th></tr></thead>
+    <tbody>
+      <tr><td>w(F) 0.64 / 1.92</td><td class="num">Banister</td><td><span class="pill ev">measured</span></td><td>Fitted to ΔHR–lactate. Intermittent work shifts that relation and TRIMP then under-prices the session (Akubat).</td></tr>
+      <tr><td>C(i) polynomials</td><td class="num">Minetti 2002</td><td><span class="pill ev">measured</span></td><td>Re-checked against the paper's own reported extremes: within 1.6–5.9&nbsp;%. <b>Exception:</b> the walking polynomial is 39&nbsp;% high at its −10&nbsp;% minimum — do not use C<sub>w</sub> for shallow downhill.</td></tr>
+      <tr><td>20.9 J·mL⁻¹ O₂</td><td class="num">20.9</td><td><span class="pill ev">measured</span></td><td>Caloric equivalent at RER ≈ 0.96; true range 19.6–21.1.</td></tr>
+      <tr><td>δ(t) slope</td><td class="num">3.5 %/h</td><td><span class="pill der">derived</span></td><td>Midpoint of Hunter (5.5&nbsp;%/90&nbsp;min running) and Hamilton (6&nbsp;%/150&nbsp;min cycling).</td></tr>
+      <tr><td>δ(t) onset &amp; cap</td><td class="num">90 min / 1.30</td><td><span class="pill as">assumed</span></td><td>Onset set by the shortest protocol in evidence. The cap has no empirical basis.</td></tr>
+      <tr><td>Altitude decrement</td><td class="num">6.5 %/1000 m</td><td><span class="pill as">assumed</span></td><td><b>Gap:</b> commonly cited textbook figure; no primary source verified. Verify before using above 3000&nbsp;m. HR<sub>max</sub> also falls at altitude, distorting Tier A independently.</td></tr>
+      <tr><td>Pack mass additive</td><td class="num">m + load</td><td><span class="pill ev">measured</span></td><td>Goldman &amp; Iserson: for grade walking, cost per unit weight is the same for body or load. <b>Bounded:</b> Pandolf-type models under-predict by 12–33&nbsp;% at 23–38&nbsp;kg — safe for vests, not heavy packs.</td></tr>
+      <tr><td>Speed exponent 1.13</td><td class="num">v<sup>1.13</sup></td><td><span class="pill der">derived</span></td><td>ln(1.31)/ln(16.0/12.6) from Rice's competitive-vs-recreational tibial load. Two speed points only.</td></tr>
+      <tr><td>k<sub>m</sub></td><td class="num">1.5</td><td><span class="pill as">assumed</span></td><td>No published dose–response exponent for eccentric running damage. See the sensitivity table.</td></tr>
+      <tr><td>k<sub>b</sub></td><td class="num">3.0</td><td><span class="pill as">assumed</span></td><td>Gentle end of cortical-bone fatigue-life exponents, chosen conservatively because Rice's damage-rate effect was only a trend (p = 0.058).</td></tr>
+      <tr><td>γ(i) grade factor</td><td class="num">1.2 / 1.0 / 0.7</td><td><span class="pill as">assumed</span></td><td>Direction supported (Vernillo: uphill raises duty factor, cutting peak force); magnitudes are not.</td></tr>
+      <tr><td>κ<sub>p</sub> poles</td><td class="num">0.85–0.90</td><td><span class="pill as">assumed</span></td><td>Foissac measured −15&nbsp;% lower-limb EMG uphill, but EMG reduction is not load reduction, and Perrey found poles <i>raise</i> metabolic cost downhill. Note the asymmetry: poles belong in MechL, <b>not</b> AeL.</td></tr>
+      <tr><td>κ<sub>s</sub> technical terrain</td><td class="num">1.05–1.10</td><td><span class="pill der">derived</span></td><td>Jessup: variable-grade walking cost 8.3&nbsp;% more than fixed-grade for identical net work. A metabolic finding used as a mechanical proxy — a stretch.</td></tr>
+      <tr><td>ω default</td><td class="num">0.25</td><td><span class="pill as">assumed</span></td><td>Leans on Tiller's argument that muscle damage, not aerobic capacity, limits long ultras.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="limits">
+  <h2>What is still missing</h2>
+  <p class="lede">Neither equation prices sleep loss, GI failure, thermal strain in Tier A, or the fact that fatigue itself changes mechanics mid-session — Khassetarash showed leg stiffness dropping and duty factor rising through a single 30-minute descent, and Trama found vastus lateralis vibration damping altered after races from 40 to 171&nbsp;km. A step late in a race is not the same step as one early in it, and no term here captures that.</p>
+  <p>Acute:chronic workload ratios are also deliberately absent. Wang's review documents the structural problems — ratios of correlated quantities, an initial-load artefact in the EWMA formulation, and inapplicability to sports that taper. Ultra training is nothing but tapers and spikes. Plot the two channels as rolling series and read the shape; do not compute a ratio and trust a threshold.</p>
+</section>
+
+<section id="refs">
+  <h2>Sources</h2>
+  <ol class="refs">
+    <li>Minetti et al., 2002. Energy cost of walking and running at extreme uphill and downhill slopes. <i>J Appl Physiol</i>.</li>
+    <li>Vernillo et al., 2017. Biomechanics and Physiology of Uphill and Downhill Running. <i>Sports Medicine</i>.</li>
+    <li>Millet et al., 2011. Neuromuscular Consequences of an Extreme Mountain Ultra-Marathon. <i>PLoS ONE</i>.</li>
+    <li>Tiller et al., 2024. Decoding Ultramarathon: Muscle Damage as the Main Impediment to Performance. <i>Sports Medicine</i>.</li>
+    <li>Matijevich et al., 2019. Ground reaction force metrics are not strongly correlated with tibial bone load. <i>PLoS ONE</i>.</li>
+    <li>Rice et al., 2024. Tibial loading and damage accumulation during a demanding 10 km run. <i>Eur J Sport Sci</i>.</li>
+    <li>Bontemps et al., 2020. Downhill Running: What Are The Effects and How Can We Adapt? <i>Sports Medicine</i>.</li>
+    <li>Bontemps et al., 2025. Muscle soreness but not neuromuscular fatigue responses following downhill running differ according to the number of exercise bouts. <i>Eur J Sport Sci</i>.</li>
+    <li>Khassetarash et al., 2022. The repeated bout effect influences lower-extremity biomechanics during a 30-min downhill run. <i>Eur J Sport Sci</i>.</li>
+    <li>McHugh, 2003. Recent advances in the understanding of the repeated bout effect. <i>Scand J Med Sci Sports</i>.</li>
+    <li>Hunter et al., 2025. Durability of Parameters Associated With Endurance Running in Marathoners. <i>Eur J Sport Sci</i>.</li>
+    <li>Hamilton et al., 2024. Durability of the moderate-to-heavy-intensity transition. <i>Eur J Appl Physiol</i>.</li>
+    <li>Foster et al., 2017. Monitoring Training Loads: The Past, the Present, and the Future. <i>IJSPP</i>.</li>
+    <li>Akubat et al., 2011. Intermittent exercise alters the heart rate–blood lactate relationship used for calculating TRIMP. <i>JSAMS</i>.</li>
+    <li>Wang et al., 2020. Analyzing Activity and Injury: Lessons Learned from the Acute:Chronic Workload Ratio. <i>Sports Medicine</i>.</li>
+    <li>Goldman &amp; Iserson, 1962. Energy cost of load carriage. <i>J Appl Physiol</i>.</li>
+    <li>Drain et al., 2017. The Pandolf equation under-predicts the metabolic rate of contemporary military load carriage. <i>JSAMS</i>.</li>
+    <li>Foissac et al., 2008. Effects of hiking pole inertia on energy and muscular costs during uphill walking. <i>MSSE</i>.</li>
+    <li>Perrey &amp; Fabre, 2008. Exertion during uphill, level and downhill walking with and without hiking poles. <i>JSSM</i>.</li>
+    <li>Jessup et al., 2023. The Metabolic Cost of Walking Uphill and Downhill With Varying Grades. <i>J Appl Physiol</i>.</li>
+    <li>Rosbrook et al., 2023. Heat Stress Drifts Cardiometabolic Parameters During Prolonged Load Carriage Exercise. <i>MSSE</i>.</li>
+    <li>Trama et al., 2022. Does neuromuscular fatigue generated by trail running modify foot-ground impact and soft tissue vibrations? <i>Eur J Sport Sci</i>.</li>
+    <li>Lecina et al., 2024. Exertional Rhabdomyolysis and Ultra-Trail Races. <i>Muscles</i>.</li>
+    <li>George et al., 2024. Stress fracture of bone under physiological multiaxial cyclic loading. <i>Bone</i>.</li>
+  </ol>
+</section>
+
+<footer>
+  Formulas live in <code>lib/load-model.js</code> and persistence in <code>lib/store.js</code>, both asserted in <a href="tests/index.html">tests</a> — 116 checks against paper-reported values, hand-verified worked examples, and the sync merge rules. Not medical advice.
+</footer>
+
+</div>
+
+<script src="lib/load-model.js"></script>
+<script src="assets/model-page.js"></script>
+</body>
+</html>
