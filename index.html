@@ -210,6 +210,69 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
   .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
   .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
+  /* ---- day table ---- */
+  .sportTag{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.07em;
+    text-transform:uppercase; padding:2px 5px; border-radius:2px; margin-right:5px;
+    vertical-align:1px}
+  .sportTag.run{background:var(--mech-soft); color:var(--mech-ink)}
+  .sportTag.bike{background:var(--aero-soft); color:var(--aero-ink)}
+  .muted{color:var(--muted); font-style:italic}
+  td.acts{white-space:nowrap}
+  td.acts .del{padding:2px 5px}
+
+  /* ---- sport picker ---- */
+  .sportpick{display:flex; gap:2px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:3px; padding:2px; width:fit-content}
+  .sportpick button{background:transparent; border:none; padding:10px 22px; font-size:14px;
+    border-radius:2px; min-height:44px}
+  .sportpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
+
+  /* ======================================================================
+     MOBILE. Written for an iPhone held one-handed after a run.
+     ====================================================================== */
+  @media (max-width: 640px) {
+    .wrap{padding:0 14px 60px}
+    header.mast{padding:24px 0 16px}
+    h1{font-size:27px}
+    .standfirst{font-size:15.5px}
+    section{margin-top:32px}
+    .panel{padding:14px}
+    p{font-size:15.5px}
+
+    /* Single column beats a cramped two-up at this width. */
+    .corefields, .gridauto, .keyrow{grid-template-columns:1fr !important}
+
+    /* Thumb-sized controls. 44px is the floor Apple designs to. */
+    button{min-height:44px; padding:11px 18px; font-size:15px}
+    .btnrow{gap:8px}
+    .btnrow button{flex:1 1 auto}
+    .unitpick button, .sportpick button{flex:1; min-height:44px}
+    .unitpick, .sportpick{width:100%}
+    .del{min-width:40px; min-height:38px}
+
+    /* Readouts stack two-up instead of five-across. */
+    .readout{grid-template-columns:1fr 1fr}
+    .ro .v{font-size:25px}
+    .rolling{grid-template-columns:1fr 1fr; gap:10px}
+
+    /* Tables stay scrollable rather than squeezing the page sideways. */
+    .tblwrap{-webkit-overflow-scrolling:touch}
+    table.log{font-size:12.5px}
+    table.log th, table.log td{padding:8px 9px}
+
+    figure.chart figcaption span{font-size:13px}
+    .chartbox{padding:10px 6px 6px}
+  }
+
+  /* iOS zooms the whole page when a focused input is under 16px. That zoom
+     does not reverse on blur, so one tap on a field leaves the layout stuck
+     wide. Forcing 16px on touch devices is the fix; it costs a little density
+     and buys a page that behaves. */
+  @media (hover: none) and (pointer: coarse) {
+    input, select, textarea{font-size:16px}
+    input[type="date"]{font-size:16px}
+  }
+
   .charts{display:grid; gap:26px; margin-top:26px}
   figure.chart{margin:0}
   figure.chart figcaption{margin-bottom:11px}
@@ -275,34 +338,66 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   </div>
 </header>
 
-<section id="entry" style="margin-top:0">
-  <h2>Log a session</h2>
+<section id="morning" style="margin-top:0">
+  <h2>Morning check-in</h2>
+  <div class="panel">
+    <div class="banner" id="mornBanner" hidden></div>
+    <div class="gridauto">
+      <div class="f"><label for="mDate">Date</label>
+        <input id="mDate" type="date"></div>
+      <div class="f"><label for="mHrv">HRV <span class="sublab">ms</span></label>
+        <input id="mHrv" type="number" inputmode="decimal" placeholder="—" step="1" min="0"></div>
+      <div class="f"><label for="mRhr">Resting HR <span class="sublab">bpm</span></label>
+        <input id="mRhr" type="number" inputmode="numeric" placeholder="—" step="1" min="0"></div>
+      <div class="f"><label for="mSore">Soreness <span class="sublab">0–10</span></label>
+        <input id="mSore" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
+      <div class="f"><label for="mSleep">Sleep <span class="sublab">0–10</span></label>
+        <input id="mSleep" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
+    </div>
+    <div class="f" style="margin-top:12px"><label for="mNotes">Sleep notes</label>
+      <input id="mNotes" type="text" class="serif" placeholder="woke at 3, hot room"></div>
+    <div class="btnrow">
+      <button type="button" class="primary" id="saveMorning">Save check-in</button>
+      <span class="savenote" id="mornNote"></span>
+    </div>
+  </div>
+</section>
+
+<section id="entry">
+  <h2>Log a workout</h2>
   <div class="panel">
     <div class="banner" id="editBanner" hidden></div>
     <div class="banner warn" id="warnBanner" hidden></div>
-    <div class="corefields">
+    <div class="sportpick" role="group" aria-label="Sport">
+      <button type="button" id="sportRun" aria-pressed="true">Run</button>
+      <button type="button" id="sportBike" aria-pressed="false">Bike</button>
+    </div>
+    <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Cycling has no eccentric phase and no impact cycles, so Ê and B̂ read <b>n/a</b> rather than zero. AeL is unchanged — see Profile for the bike HR max and factor.</p>
+    <div class="corefields" style="margin-top:14px">
       <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
-      <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" value="120" step="1" min="1"></div>
-      <div class="f"><label for="hr">Avg HR <span class="sublab">bpm</span></label><input id="hr" type="number" value="145" step="1" min="1"></div>
-      <div class="f"><label for="dist">Distance <span class="sublab" id="uDist">km</span></label><input id="dist" type="number" value="16" step="0.1" min="0"></div>
-      <div class="f"><label for="up">Ascent <span class="sublab" id="uUp">m</span></label><input id="up" type="number" value="900" step="10" min="0"></div>
-      <div class="f"><label for="down">Descent <span class="sublab" id="uDown">m</span></label><input id="down" type="number" value="900" step="10" min="0"></div>
+      <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" inputmode="numeric" value="120" step="1" min="1"></div>
+      <div class="f"><label for="hr">Avg HR <span class="sublab">bpm</span></label><input id="hr" type="number" inputmode="numeric" value="145" step="1" min="1"></div>
+      <div class="f"><label for="dist">Distance <span class="sublab" id="uDist">km</span></label><input id="dist" type="number" inputmode="decimal" value="16" step="0.1" min="0"></div>
+      <div class="f" id="fUp"><label for="up">Ascent <span class="sublab" id="uUp">m</span></label><input id="up" type="number" inputmode="numeric" value="900" step="10" min="0"></div>
+      <div class="f" id="fDown"><label for="down">Descent <span class="sublab" id="uDown">m</span></label><input id="down" type="number" inputmode="numeric" value="900" step="10" min="0"></div>
     </div>
     <div class="f" style="margin-top:12px"><label for="label">Session label</label><input id="label" type="text" class="serif" placeholder="Morning trail loop"></div>
 
     <div class="subsection">
       <div class="hdr">
         <span class="disp">Optional</span>
-        <span>the first two unlock B̂ · soreness is filled in the next morning using <b>edit</b></span>
+        <span id="optHint">descent + climb minutes unlock B̂</span>
       </div>
       <div class="gridauto">
-        <div class="f"><label for="dmin">Descent time <span class="sublab">min</span></label><input id="dmin" type="number" placeholder="—" step="1" min="0"></div>
-        <div class="f"><label for="umin">Climb time <span class="sublab">min</span></label><input id="umin" type="number" placeholder="—" step="1" min="0"></div>
-        <div class="f"><label for="cad">Descent cadence <span class="sublab">spm</span></label><input id="cad" type="number" placeholder="176" step="1" min="0"></div>
-        <div class="f"><label for="pack">Pack <span class="sublab" id="uPack">kg</span></label><input id="pack" type="number" value="0" step="0.5" min="0"></div>
-        <div class="f"><label for="rpe">RPE <span class="sublab">0–10</span></label><input id="rpe" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
-        <div class="f"><label for="sore">Quad soreness <span class="sublab">next day, 0–10</span></label><input id="sore" type="number" placeholder="—" step="0.5" min="0" max="10"></div>
+        <div class="f" id="fDmin"><label for="dmin">Descent time <span class="sublab">min</span></label><input id="dmin" type="number" inputmode="numeric" placeholder="—" step="1" min="0"></div>
+        <div class="f" id="fUmin"><label for="umin">Climb time <span class="sublab">min</span></label><input id="umin" type="number" inputmode="numeric" placeholder="—" step="1" min="0"></div>
+        <div class="f" id="fCad"><label for="cad">Descent cadence <span class="sublab">spm</span></label><input id="cad" type="number" inputmode="numeric" placeholder="176" step="1" min="0"></div>
+        <div class="f" id="fPack"><label for="pack">Pack <span class="sublab" id="uPack">kg</span></label><input id="pack" type="number" inputmode="decimal" value="0" step="0.5" min="0"></div>
+        <div class="f"><label for="rpe">RPE <span class="sublab">0–10</span></label><input id="rpe" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
       </div>
+      <!-- Soreness moved to the morning check-in. Kept hidden so any stale
+           reference reads an empty string rather than throwing. -->
+      <input id="sore" type="hidden" value="">
     </div>
 
     <div class="readout">
@@ -325,19 +420,20 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 </section>
 
 <section id="log">
-  <h2>Session history</h2>
+  <h2>Daily log</h2>
   <div class="tblwrap">
     <table class="log">
       <thead><tr>
-        <th>Date</th><th>Session</th><th>min</th><th>HR</th>
+        <th>Date</th><th>HRV</th><th>RHR</th><th>Sleep</th><th>Sore</th>
+        <th>Workout</th><th>min</th><th>HR</th>
         <th id="thDist">km</th><th id="thUp">D+ m</th><th id="thDown">D− m</th>
-        <th>AeL</th><th>Ê</th><th>B̂</th><th>RPE</th><th>Sore</th><th></th><th></th>
+        <th>AeL</th><th>Ê</th><th>B̂</th><th></th>
       </tr></thead>
       <tbody id="logBody"></tbody>
     </table>
-    <div class="empty" id="logEmpty">No sessions yet. Fill in the five fields above and press <b>Add to log</b>.</div>
+    <div class="empty" id="logEmpty">Nothing logged yet. Save a morning check-in or a workout above.</div>
   </div>
-  <p class="savenote" style="margin-top:10px">AeL, Ê and B̂ are not stored — they are recomputed from your profile every time this table renders. Change <code>k<sub>m</sub></code> or your descent step length and the whole history corrects itself.</p>
+  <p class="savenote" style="margin-top:10px">Loads are recomputed from your profile on every render, never stored — so changing <code>k<sub>m</sub></code> re-prices the whole history.</p>
 
   <div class="rolling">
     <div class="rcard a"><div class="k">AeL · last 7 days</div><div class="v" id="r7a">—</div><div class="n" id="r7an">—</div></div>
@@ -391,6 +487,20 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
     <figure class="chart">
       <figcaption>
+        <b>Morning readiness</b>
+        <span>HRV and resting heart rate from the check-in, with sleep score. Bars behind them are that day's aerobic load — <b>look for HRV dropping and resting HR rising in the days after a big bar.</b></span>
+      </figcaption>
+      <div class="chartbox"><svg id="chReadiness" viewBox="0 0 900 280" width="100%" height="280" role="img" aria-label="HRV, resting heart rate and sleep score over time against daily aerobic load"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--aero); height:3px"></i>HRV (left)</span>
+        <span><i style="background:var(--mech); height:3px"></i>resting HR (right)</span>
+        <span><i style="background:var(--flag)"></i>sleep 0–10</span>
+        <span><i style="background:var(--surface-2)"></i>daily AeL</span>
+      </div>
+    </figure>
+
+    <figure class="chart">
+      <figcaption>
         <b>Does Ê predict your soreness?</b>
         <span id="scatterCaption">One dot per scored session. This is the calibration question — a strong positive slope means the eccentric channel describes <i>your</i> body, not the literature's average one. A weak one points at <code>k<sub>m</sub></code> or your descent step length, never at the descent metres.</span>
       </figcaption>
@@ -407,11 +517,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <div class="rcard m"><div class="k">Ê vs next-day soreness</div><div class="v" id="cSore">—</div><div class="n" id="cSoreN">needs 5+ scored sessions</div></div>
     <div class="rcard a"><div class="k">AeL vs RPE</div><div class="v" id="cRpe">—</div><div class="n" id="cRpeN">needs 5+ scored sessions</div></div>
   </div>
-  <div class="callout">
-    <h4>How to read these</h4>
-    <p>A strong positive correlation for <b>Ê vs soreness</b> means the eccentric channel is tracking your actual tissue response. A weak one points at <code>k<sub>m</sub></code> or your descent step length, not at the descent metres — those are measured, the other two are assumed. Adjust one at a time below and watch the correlation move; because nothing derived is stored, the entire history re-prices instantly.</p>
-    <p>Rule of thumb at your current settings: <b><span id="ruleOfThumb">—</span></b>. Enough to price a route off its elevation profile before you leave the house.</p>
-  </div>
+  <p class="savenote" style="margin-top:12px">A weak correlation points at <code>k<sub>m</sub></code> or your descent step length — never at the descent metres, which are measured. Rule of thumb at your settings: <b><span id="ruleOfThumb">—</span></b>.</p>
 </section>
 
 <section id="profile">
@@ -436,7 +542,15 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <div class="f"><label for="km">k<sub>m</sub> <span class="sublab">muscle exponent</span></label><input id="km" type="number" value="1.5" step="0.25" min="1" max="2.5"></div>
       <div class="f"><label for="kb">k<sub>b</sub> <span class="sublab">bone exponent</span></label><input id="kb" type="number" value="3" step="0.5" min="1" max="6"></div>
     </div>
-    <p class="savenote" style="margin-top:12px">The profile — including your unit choice — travels with the log, so a new device picks it up on first sync.</p>
+    <div class="subsection">
+      <div class="hdr"><span class="disp">Bike</span><span>used only for sessions logged as Bike</span></div>
+      <div class="gridauto">
+        <div class="f"><label for="bikeHrMax">Bike HR max <span class="sublab">0 = use running max</span></label><input id="bikeHrMax" type="number" inputmode="numeric" value="0" min="0" max="240"></div>
+        <div class="f"><label for="bikeFactor">Bike AeL factor</label><input id="bikeFactor" type="number" inputmode="decimal" value="1" step="0.05" min="0.1" max="2"></div>
+      </div>
+      <p class="savenote" style="margin-top:10px"><b>The factor defaults to 1.00, not 0.6.</b> AeL is internal load from heart-rate reserve, and at matched %HRR cycling produces <i>more</i> metabolic stress than running, not less. The familiar 0.6 is an external running-specificity conversion — a different question. Set it to 0.6 if that is the question you want answered. The correction that is actually defensible is a lower bike HR max, above.</p>
+    </div>
+    <p class="savenote" style="margin-top:12px">The profile travels with the log, so a new device picks it up on first sync.</p>
   </div>
 </section>
 
@@ -795,11 +909,57 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
    * profile: { massKg, male, hrMax, hrRest, descentStepLengthM?,
    *            kMuscle?, kBone?, cadenceSpm? }
    */
+  /**
+   * Sports for which the mechanical channels do not apply.
+   *
+   * Cycling is a near-pure concentric action with no flight phase: there is no
+   * eccentric muscle damage for Ê to measure and no impact cycles for B̂. Both
+   * return null — "not applicable" — rather than 0, for the same reason B̂
+   * shows a dash without a speed split. A zero would sit in the weekly totals
+   * and the charts looking like a real, easy number.
+   */
+  var NO_MECHANICAL = { bike: true };
+
   function evaluateSession(session, profile) {
-    var a = aerobicLoadSimple(session, profile);
-    var e = eccentricLoadSimple(session, profile);
-    var c = cyclicLoadSimple(session, profile);
+    var sport = session.sport === "bike" ? "bike" : "run";
+    var p = profile || {};
+
+    // Maximal heart rate is typically lower on a bike than running, so using a
+    // running HR max on the bike inflates the reserve span and UNDER-states
+    // cycling intensity. A sport-specific max fixes that at the source rather
+    // than patching the output with a fudge factor.
+    if (sport === "bike" && p.bikeHrMax > 0) {
+      var swapped = {};
+      Object.keys(p).forEach(function (k) { swapped[k] = p[k]; });
+      swapped.hrMax = p.bikeHrMax;
+      p = swapped;
+    }
+
+    var a = aerobicLoadSimple(session, p);
+
+    // Defaults to 1.00, NOT the 0.6 people expect. AeL is internal load from
+    // heart-rate reserve, and at matched %HRR cycling produces MORE metabolic
+    // stress than running, not less (Kodesh 2024: 6.2 vs 2.9 mmol/L lactate at
+    // 70 % HRR). The familiar 0.6 is an external running-specificity
+    // conversion answering a different question. Adjustable because that is a
+    // legitimate question to ask.
+    var factor = (sport === "bike" && p.bikeAeLFactor > 0) ? p.bikeAeLFactor : 1;
+
+    if (NO_MECHANICAL[sport]) {
+      return {
+        sport: sport,
+        aeL: a.aeL * factor,
+        reserveFraction: a.reserveFraction,
+        eccentric: null,
+        cyclic: null,
+        meanDescentGrade: 0,
+        descentDistanceM: 0
+      };
+    }
+    var e = eccentricLoadSimple(session, p);
+    var c = cyclicLoadSimple(session, p);
     return {
+      sport: sport,
       aeL: a.aeL,
       reserveFraction: a.reserveFraction,
       eccentric: e.eccentric,
@@ -842,7 +1002,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     eccentricReference: eccentricReference,
     cyclicLoadSimple: cyclicLoadSimple,
     cyclicLoadBuckets: cyclicLoadBuckets,
-    evaluateSession: evaluateSession,
+    evaluateSession: evaluateSession, NO_MECHANICAL: NO_MECHANICAL,
     blendMechanical: blendMechanical,
     eccentricPer100m: eccentricPer100m
   };
@@ -1036,20 +1196,34 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     id: "i", date: "d", label: "n", durationMin: "t", avgHr: "h",
     distanceKm: "k", ascentM: "u", descentM: "w", packKg: "p",
     descentMin: "dm", climbMin: "cm", cadenceSpm: "c",
-    rpe: "r", soreness: "s", editedAt: "e", deletedAt: "x"
+    // `soreness` is retained on the session for backwards compatibility with
+    // logs written before the morning check-in existed. New entries put it on
+    // the morning instead; readers fall back to this one for old rows.
+    rpe: "r", soreness: "s", editedAt: "e", deletedAt: "x", sport: "sp"
   };
   var PROFILE_MAP = {
     massKg: "m", male: "g", hrMax: "hx", hrRest: "hn",
-    descentStepLengthM: "sl", kMuscle: "km", kBone: "kb", units: "un"
+    descentStepLengthM: "sl", kMuscle: "km", kBone: "kb", units: "un",
+    bikeHrMax: "bhx", bikeAeLFactor: "baf"
+  };
+
+  // One morning check-in per date, keyed by date — a second on the same day
+  // would be meaningless, so there is no separate id to collide.
+  var MORNING_MAP = {
+    date: "d", hrv: "v", restingHr: "rh", soreness: "s",
+    sleepScore: "sq", sleepNotes: "sn", editedAt: "e", deletedAt: "x"
   };
   var TIME_FIELDS = ["editedAt", "deletedAt"];
 
   var SESSION_FIELDS = Object.keys(SESSION_MAP);
   var PROFILE_FIELDS = Object.keys(PROFILE_MAP);
+  var MORNING_FIELDS = Object.keys(MORNING_MAP);
 
   var DEFAULT_PROFILE = {
     massKg: 70, male: true, hrMax: 188, hrRest: 46,
-    descentStepLengthM: 1.05, kMuscle: 1.5, kBone: 3.0, units: "metric"
+    descentStepLengthM: 1.05, kMuscle: 1.5, kBone: 3.0, units: "metric",
+    bikeHrMax: 0,         // 0 = unset, fall back to the running max
+    bikeAeLFactor: 1.0    // see the note in evaluateSession
   };
 
   function invert(map) {
@@ -1059,12 +1233,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   }
   var SESSION_UNMAP = invert(SESSION_MAP);
   var PROFILE_UNMAP = invert(PROFILE_MAP);
+  var MORNING_UNMAP = invert(MORNING_MAP);
 
   // ---------------------------------------------------------------- schema ---
 
   function now() { return Math.floor(Date.now() / 1000); }
   function emptyDoc() {
-    return { schema: SCHEMA, rev: 0, updatedAt: now(), profile: {}, sessions: [] };
+    return { schema: SCHEMA, rev: 0, updatedAt: now(),
+             profile: {}, sessions: [], mornings: [] };
   }
   function keep(v) { return v !== undefined && v !== null && v !== ""; }
 
@@ -1089,7 +1265,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       profile: readFields(d.profile, PROFILE_FIELDS, PROFILE_UNMAP),
       sessions: (Array.isArray(d.sessions) ? d.sessions : [])
         .map(function (s) { return readFields(s, SESSION_FIELDS, SESSION_UNMAP); })
-        .filter(function (s) { return !!s.id; })
+        .filter(function (s) { return !!s.id; }),
+      // Absent in logs written before the morning check-in existed, which is
+      // why this tolerates a missing array rather than assuming one.
+      mornings: (Array.isArray(d.mornings) ? d.mornings : [])
+        .map(function (m) { return readFields(m, MORNING_FIELDS, MORNING_UNMAP); })
+        .filter(function (m) { return !!m.date; })
     };
   }
 
@@ -1126,7 +1307,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return {
       v: SCHEMA, rev: d.rev, ts: d.updatedAt,
       profile: mapKeys(d.profile, PROFILE_MAP),
-      sessions: d.sessions.map(function (s) { return mapKeys(s, SESSION_MAP); })
+      sessions: d.sessions.map(function (s) { return mapKeys(s, SESSION_MAP); }),
+      mornings: d.mornings.map(function (m) { return mapKeys(m, MORNING_MAP); })
     };
   }
   function mapKeys(obj, map) {
@@ -1139,8 +1321,111 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return normalise({
       rev: w.rev,
       updatedAt: w.ts !== undefined ? w.ts : w.updatedAt,
-      profile: w.profile, sessions: w.sessions
+      profile: w.profile, sessions: w.sessions, mornings: w.mornings
     });
+  }
+
+  // ------------------------------------------------------------- mornings ---
+
+  function liveMornings(doc) {
+    return (doc.mornings || [])
+      .filter(function (m) { return !m.deletedAt; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  }
+  function morningFor(doc, date) {
+    var found = null;
+    (doc.mornings || []).forEach(function (m) {
+      if (m.date === date && !m.deletedAt) found = m;
+    });
+    return found;
+  }
+  /** Insert or replace the check-in for a date. Returns the mutated doc. */
+  function upsertMorning(doc, morning) {
+    var d = doc;
+    if (!Array.isArray(d.mornings)) d.mornings = [];
+    var idx = -1;
+    d.mornings.forEach(function (m, i) { if (m.date === morning.date) idx = i; });
+    morning.editedAt = now();
+    if (idx >= 0) d.mornings[idx] = morning; else d.mornings.push(morning);
+    d.rev += 1;
+    d.updatedAt = now();
+    return d;
+  }
+
+  /**
+   * Soreness for a date, preferring the morning check-in and falling back to a
+   * session field from before check-ins existed. Old logs keep working.
+   */
+  function sorenessOn(doc, date) {
+    var m = morningFor(doc, date);
+    if (m && m.soreness != null) return m.soreness;
+    var v = null;
+    liveSessions(doc).forEach(function (s) {
+      if (s.date === date && s.soreness != null && v == null) v = s.soreness;
+    });
+    return v;
+  }
+
+  function addDays(isoDate, n) {
+    var dt = new Date(String(isoDate).slice(0, 10) + "T12:00:00Z");
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.toISOString().slice(0, 10);
+  }
+
+  /**
+   * One row per date, joining the morning check-in to that day's workouts.
+   * Loads sum across multiple workouts; a bike-only day leaves Ê and B̂ null
+   * rather than zero, so "not applicable" stays visible in the table.
+   */
+  function dayRows(doc, evaluate) {
+    var d = normalise(doc), p = profileOf(d), byDate = {};
+    function slot(date) {
+      if (!byDate[date]) {
+        byDate[date] = { date: date, morning: null, sessions: [],
+                         aeL: 0, ecc: null, cyc: null, hasRun: false, hasBike: false };
+      }
+      return byDate[date];
+    }
+    liveMornings(d).forEach(function (m) { slot(m.date).morning = m; });
+    liveSessions(d).forEach(function (s) {
+      var row = slot(s.date), r = evaluate ? evaluate(s, p) : {};
+      row.sessions.push({ session: s, result: r });
+      row.aeL += r.aeL || 0;
+      if (r.eccentric != null) row.ecc = (row.ecc || 0) + r.eccentric;
+      if (r.cyclic != null) row.cyc = (row.cyc || 0) + r.cyclic;
+      if ((s.sport || "run") === "bike") row.hasBike = true; else row.hasRun = true;
+    });
+    return Object.keys(byDate).sort().reverse().map(function (k) { return byDate[k]; });
+  }
+
+  /**
+   * Yesterday's eccentric load against this morning's soreness.
+   *
+   * The lag is the point: soreness reported on the morning of the 14th is the
+   * response to the session on the 13th. Pairing same-day would regress a
+   * cause against a state that preceded it.
+   */
+  function sorenessLagPairs(doc, evaluate) {
+    var d = normalise(doc), p = profileOf(d), out = [];
+    liveMornings(d).forEach(function (m) {
+      if (m.soreness == null) return;
+      var prev = addDays(m.date, -1), ecc = null;
+      liveSessions(d).forEach(function (s) {
+        if (s.date !== prev) return;
+        var r = evaluate ? evaluate(s, p) : {};
+        if (r.eccentric != null) ecc = (ecc || 0) + r.eccentric;
+      });
+      if (ecc == null) return;
+      out.push({ x: ecc, y: m.soreness, date: m.date, label: "after " + prev });
+    });
+    return out;
+  }
+
+  /** HRV / resting HR / sleep over time, oldest first, for the readiness chart. */
+  function readinessSeries(doc, limit) {
+    var rows = liveMornings(normalise(doc)).slice().reverse();
+    if (limit && rows.length > limit) rows = rows.slice(rows.length - limit);
+    return rows;
   }
 
   function newId() {
@@ -1175,6 +1460,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     }
     absorb(A.sessions);
     absorb(B.sessions);
+
+    // Mornings merge the same way but key on date, since there is one per day.
+    var byDate = {};
+    function absorbM(list) {
+      list.forEach(function (m) {
+        var prev = byDate[m.date];
+        if (!prev) { byDate[m.date] = m; return; }
+        if ((m.editedAt || 0) > (prev.editedAt || 0)) byDate[m.date] = m;
+      });
+    }
+    absorbM(A.mornings);
+    absorbM(B.mornings);
+
     var winner = B.rev > A.rev ? B : A;
     return {
       schema: SCHEMA,
@@ -1182,7 +1480,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       updatedAt: now(),
       profile: Object.keys(winner.profile).length ? winner.profile
              : (Object.keys(A.profile).length ? A.profile : B.profile),
-      sessions: Object.keys(byId).map(function (k) { return byId[k]; })
+      sessions: Object.keys(byId).map(function (k) { return byId[k]; }),
+      mornings: Object.keys(byDate).map(function (k) { return byDate[k]; })
     };
   }
 
@@ -1246,6 +1545,25 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return errs;
   }
 
+  /** Mirrors the ranges the morning form accepts. */
+  function validateMorning(m) {
+    var errs = [];
+    if (!m.date) errs.push("Date is required.");
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(m.date)) errs.push("Date must be YYYY-MM-DD.");
+    [["hrv", 250, "HRV"], ["restingHr", 140, "Resting HR"],
+     ["soreness", 10, "Soreness"], ["sleepScore", 10, "Sleep score"]].forEach(function (x) {
+      var v = toNum(m[x[0]]);
+      if (v != null && (v < 0 || v > x[1])) {
+        errs.push(x[2] + " is out of range (0–" + x[1] + ").");
+      }
+    });
+    var any = ["hrv", "restingHr", "soreness", "sleepScore"].some(function (k) {
+      return toNum(m[k]) != null;
+    }) || (m.sleepNotes && String(m.sleepNotes).trim());
+    if (!any) errs.push("Fill in at least one field before saving the check-in.");
+    return errs;
+  }
+
   /**
    * Non-blocking advisories: the row is valid, but a channel is uncomputable.
    * A silent zero is as dishonest as a fabricated number — Ê needs mean descent
@@ -1254,6 +1572,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
    */
   function warnSession(s) {
     var warns = [];
+    // Neither mechanical channel applies to cycling, so neither warning does.
+    if ((s.sport || "run") === "bike") return warns;
     var desc = toNum(s.descentM), dist = toNum(s.distanceKm);
     if (desc && desc > 0 && !(dist > 0)) {
       warns.push("Ê reads 0 because distance is missing — mean descent grade is " +
@@ -1442,7 +1762,21 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       b.ascentM += s.ascentM || 0;
       b.descentM += s.descentM || 0;
       if (s.rpe != null) { b.rpeSum += s.rpe; b.rpeN++; }
-      if (s.soreness != null) { b.soreSum += s.soreness; b.soreN++; }
+      // Legacy fallback only — new soreness comes from the morning check-ins
+      // below, which is why this is guarded on there being no morning for the
+      // date rather than added unconditionally.
+      if (s.soreness != null && !morningFor(d, s.date)) { b.soreSum += s.soreness; b.soreN++; }
+    });
+    liveMornings(d).forEach(function (m) {
+      if (m.soreness == null || !m.date) return;
+      var wk = mondayOf(m.date);
+      if (!buckets[wk]) {
+        buckets[wk] = { week: wk, sessions: 0, aeL: 0, ecc: 0, cyc: 0, cycCount: 0,
+                        durationMin: 0, distanceKm: 0, ascentM: 0, descentM: 0,
+                        rpeSum: 0, rpeN: 0, soreSum: 0, soreN: 0 };
+      }
+      buckets[wk].soreSum += m.soreness;
+      buckets[wk].soreN++;
     });
     return Object.keys(buckets).sort().reverse().map(function (k) {
       var b = buckets[k];
@@ -1758,6 +2092,11 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     emptyDoc: emptyDoc, normalise: normalise, pack: pack, unpack: unpack,
     profileOf: profileOf, newId: newId, now: now, toISO: toISO, toEpoch: toEpoch,
     liveSessions: liveSessions, mergeDocs: mergeDocs,
+    MORNING_MAP: MORNING_MAP,
+    liveMornings: liveMornings, morningFor: morningFor, upsertMorning: upsertMorning,
+    sorenessOn: sorenessOn, addDays: addDays, dayRows: dayRows,
+    sorenessLagPairs: sorenessLagPairs, readinessSeries: readinessSeries,
+    validateMorning: validateMorning,
     serialise: serialise, sizeInfo: sizeInfo, byteLength: byteLength,
     archiveBefore: archiveBefore,
     validateSession: validateSession, warnSession: warnSession,
@@ -1821,6 +2160,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   var editingId = null;
   var syncing = false;
   var units = "metric";
+  var sport = "run";
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -1938,6 +2278,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       descentStepLengthM: mNum("sl", "steplen"),
       kMuscle: rawNum("km"),
       kBone: rawNum("kb"),
+      bikeHrMax: rawNum("bikeHrMax"),
+      bikeAeLFactor: rawNum("bikeFactor") || 1,
       units: units
     };
   }
@@ -1949,6 +2291,71 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     setField("sl", p.descentStepLengthM, "steplen");
     $("km").value = p.kMuscle;
     $("kb").value = p.kBone;
+    $("bikeHrMax").value = p.bikeHrMax || 0;
+    $("bikeFactor").value = p.bikeAeLFactor || 1;
+  }
+
+  // ------------------------------------------------------------------ sport --
+
+  function setSport(next) {
+    sport = next === "bike" ? "bike" : "run";
+    $("sportRun").setAttribute("aria-pressed", String(sport === "run"));
+    $("sportBike").setAttribute("aria-pressed", String(sport === "bike"));
+    $("sportNote").hidden = sport !== "bike";
+    // Elevation and descent cadence have no meaning for a bike ride in this
+    // model, so hide them rather than invite numbers that change nothing.
+    ["fUp", "fDown", "fDmin", "fCad"].forEach(function (id) {
+      if ($(id)) $(id).hidden = sport === "bike";
+    });
+    if ($("optHint")) {
+      $("optHint").textContent = sport === "bike"
+        ? "RPE and pack weight only — the mechanical channels do not apply"
+        : "descent + climb minutes unlock B̂";
+    }
+    refreshLive();
+  }
+
+  // ---------------------------------------------------------------- morning --
+
+  function readMorning() {
+    return {
+      date: $("mDate").value || new Date().toISOString().slice(0, 10),
+      hrv: rawOpt("mHrv"),
+      restingHr: rawOpt("mRhr"),
+      soreness: rawOpt("mSore"),
+      sleepScore: rawOpt("mSleep"),
+      sleepNotes: ($("mNotes").value || "").trim()
+    };
+  }
+  function writeMorning(m) {
+    $("mDate").value = (m && m.date) || new Date().toISOString().slice(0, 10);
+    $("mHrv").value = m && m.hrv != null ? m.hrv : "";
+    $("mRhr").value = m && m.restingHr != null ? m.restingHr : "";
+    $("mSore").value = m && m.soreness != null ? m.soreness : "";
+    $("mSleep").value = m && m.sleepScore != null ? m.sleepScore : "";
+    $("mNotes").value = (m && m.sleepNotes) || "";
+  }
+  /** Load whatever is already stored for the date in the form. */
+  function syncMorningForm() {
+    var d = $("mDate").value;
+    var existing = d ? S.morningFor(doc, d) : null;
+    $("mornBanner").hidden = !existing;
+    if (existing) {
+      $("mornBanner").textContent =
+        "A check-in already exists for " + d + " — saving will replace it.";
+    }
+  }
+  function saveMorning() {
+    var m = readMorning();
+    var errs = S.validateMorning(m);
+    if (errs.length) { say("mornNote", errs[0], "bad"); return; }
+    doc = S.upsertMorning(doc, m);
+    dirty = true;
+    persist();
+    render();
+    say("mornNote", "Check-in saved for " + m.date + ".", "ok");
+    syncMorningForm();
+    pushRemote("check-in");
   }
 
   function readSession() {
@@ -1967,6 +2374,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       packKg: mNum("pack", "mass"),
       rpe: rawOpt("rpe"),
       soreness: rawOpt("sore"),
+      sport: sport,
       editedAt: S.now()
     };
   }
@@ -1990,6 +2398,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     $("date").value = new Date().toISOString().slice(0, 10);
     $("label").value = "";
     ["dmin", "umin", "cad", "rpe", "sore"].forEach(function (k) { $(k).value = ""; });
+    setSport("run");
     setEditMode();
   }
   function setEditMode() {
@@ -2138,32 +2547,61 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var live = S.liveSessions(doc);
     var dd = U.decimals("distance", units);
 
+    // One row per DAY: the morning check-in joined to that day's workouts.
+    // A day with two workouts gets two rows sharing one morning cell, so the
+    // morning is never silently attached to only the first session.
+    var days = S.dayRows(doc, LM.evaluateSession);
     var tb = $("logBody");
     tb.innerHTML = "";
-    $("logEmpty").hidden = live.length > 0;
-    live.forEach(function (s) {
-      var r = LM.evaluateSession(s, p);
-      var noGrade = (s.descentM > 0) && !(s.distanceKm > 0);
-      var tr = document.createElement("tr");
-      if (s.id === editingId) tr.className = "editing";
-      tr.innerHTML =
-        "<td>" + esc(s.date) + "</td>" +
-        '<td class="lbl">' + esc(s.label) + "</td>" +
-        "<td>" + Math.round(s.durationMin) + "</td>" +
-        "<td>" + Math.round(s.avgHr) + "</td>" +
-        "<td>" + (U.toDisplay(s.distanceKm || 0, "distance", units)).toFixed(dd) + "</td>" +
-        "<td>" + Math.round(U.toDisplay(s.ascentM || 0, "elevation", units)) + "</td>" +
-        "<td>" + Math.round(U.toDisplay(s.descentM || 0, "elevation", units)) + "</td>" +
-        '<td class="ae">' + Math.round(r.aeL) + "</td>" +
-        '<td class="me">' + (noGrade ? "—" : Math.round(r.eccentric)) + "</td>" +
-        '<td class="me">' + (r.cyclic == null ? "—" : Math.round(r.cyclic)) + "</td>" +
-        "<td>" + (s.rpe == null ? "—" : s.rpe) + "</td>" +
-        "<td>" + (s.soreness == null ? "—" : s.soreness) + "</td>" +
-        '<td><button type="button" class="del ed" data-id="' + esc(s.id) + '" ' +
-          'title="Edit — use this to add next-day soreness">edit</button></td>' +
-        '<td><button type="button" class="del rm" data-id="' + esc(s.id) + '" ' +
-          'aria-label="Delete session">×</button></td>';
-      tb.appendChild(tr);
+    $("logEmpty").hidden = days.length > 0;
+
+    function num(v, dp) {
+      return v == null ? "—" : (dp ? v.toFixed(dp) : String(Math.round(v)));
+    }
+
+    days.forEach(function (day) {
+      var m = day.morning;
+      var rowsForDay = day.sessions.length ? day.sessions : [null];
+      rowsForDay.forEach(function (entry, i) {
+        var s = entry && entry.session, r = entry && entry.result;
+        var tr = document.createElement("tr");
+        if (s && s.id === editingId) tr.className = "editing";
+        var span = rowsForDay.length > 1 && i === 0 ? ' rowspan="' + rowsForDay.length + '"' : "";
+        var head = i === 0
+          ? "<td" + span + ">" + esc(day.date) + "</td>" +
+            "<td" + span + ">" + num(m && m.hrv) + "</td>" +
+            "<td" + span + ">" + num(m && m.restingHr) + "</td>" +
+            "<td" + span + ">" + num(m && m.sleepScore, 1) + "</td>" +
+            "<td" + span + ">" + num(m && m.soreness, 1) + "</td>"
+          : "";
+        if (!s) {
+          tr.innerHTML = head +
+            '<td class="lbl" colspan="10"><span class="muted">rest day</span>' +
+            (m && m.sleepNotes ? " — " + esc(m.sleepNotes) : "") +
+            ' <button type="button" class="del em" data-date="' + esc(day.date) + '">edit</button></td>';
+          tb.appendChild(tr);
+          return;
+        }
+        var noGrade = (s.descentM > 0) && !(s.distanceKm > 0);
+        var isBike = (s.sport || "run") === "bike";
+        tr.innerHTML = head +
+          '<td class="lbl"><span class="sportTag ' + (isBike ? "bike" : "run") + '">' +
+            (isBike ? "bike" : "run") + "</span> " + esc(s.label) + "</td>" +
+          "<td>" + Math.round(s.durationMin) + "</td>" +
+          "<td>" + Math.round(s.avgHr) + "</td>" +
+          "<td>" + (isBike ? "—" : U.toDisplay(s.distanceKm || 0, "distance", units).toFixed(dd)) + "</td>" +
+          "<td>" + (isBike ? "—" : Math.round(U.toDisplay(s.ascentM || 0, "elevation", units))) + "</td>" +
+          "<td>" + (isBike ? "—" : Math.round(U.toDisplay(s.descentM || 0, "elevation", units))) + "</td>" +
+          '<td class="ae">' + Math.round(r.aeL) + "</td>" +
+          '<td class="me">' + (r.eccentric == null ? "n/a" : (noGrade ? "—" : Math.round(r.eccentric))) + "</td>" +
+          '<td class="me">' + (r.cyclic == null ? (isBike ? "n/a" : "—") : Math.round(r.cyclic)) + "</td>" +
+          '<td class="acts">' +
+            '<button type="button" class="del ed" data-id="' + esc(s.id) + '">edit</button>' +
+            '<button type="button" class="del em" data-date="' + esc(day.date) + '">am</button>' +
+            '<button type="button" class="del rm" data-id="' + esc(s.id) + '" ' +
+              'aria-label="Delete workout">×</button></td>';
+        tb.appendChild(tr);
+      });
     });
     tb.querySelectorAll("button.ed").forEach(function (b) {
       b.addEventListener("click", function () { beginEdit(b.getAttribute("data-id")); });
@@ -2171,9 +2609,18 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     tb.querySelectorAll("button.rm").forEach(function (b) {
       b.addEventListener("click", function () { removeSession(b.getAttribute("data-id")); });
     });
+    tb.querySelectorAll("button.em").forEach(function (b) {
+      b.addEventListener("click", function () { editMorning(b.getAttribute("data-date")); });
+    });
 
-    renderWeeks();
-    renderCharts();
+    // Charts are the most elaborate thing here and the least essential. A
+    // drawing bug must not take the log table down with it.
+    try {
+      renderWeeks();
+      renderCharts();
+    } catch (e) {
+      if (window.console && console.error) console.error("[charts]", e);
+    }
     renderRolling();
     renderCorrelations(p);
     renderStorage();
@@ -2216,10 +2663,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   }
 
   function renderCorrelations(p) {
-    var ePairs = [], aPairs = [];
+    // Soreness is now a morning state, so the pairing is lagged: yesterday's
+    // eccentric load against this morning's score. Same-day would regress a
+    // cause against a state that preceded it.
+    var lag = S.sorenessLagPairs(doc, LM.evaluateSession);
+    var ePairs = lag.map(function (q) { return [q.x, q.y]; });
+    var aPairs = [];
     S.liveSessions(doc).forEach(function (s) {
       var r = LM.evaluateSession(s, p);
-      if (s.soreness != null) ePairs.push([r.eccentric, s.soreness]);
       if (s.rpe != null) aPairs.push([r.aeL, s.rpe]);
     });
     setCorr("cSore", "cSoreN", S.correlate(ePairs), ePairs.length);
@@ -2263,12 +2714,23 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     doc.sessions.forEach(function (s) { if (s.id === id) found = s; });
     if (!found) return;
     editingId = id;
+    setSport(found.sport || "run");
     writeSession(found);
     setEditMode();
     refreshLive();
     render();
-    note("Editing " + found.date + ". Add soreness, then Update.", "");
+    note("Editing the workout on " + found.date + ".", "");
     $("entry").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** Jump to the morning form with that date's check-in loaded. */
+  function editMorning(date) {
+    var m = S.morningFor(doc, date);
+    writeMorning(m || { date: date });
+    syncMorningForm();
+    say("mornNote", m ? "Editing the check-in for " + date + "."
+                      : "New check-in for " + date + ".", "");
+    $("morning").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function removeSession(id) {
@@ -2459,12 +2921,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   /* ---- 3. Ê vs soreness scatter ------------------------------------------- */
   function drawScatter() {
     var svg = $("chScatter"), W = 900, H = 320, L = 56, R = 20, T = 20, B = 48;
-    var pts = S.scatterPairs(doc, LM.evaluateSession, "eccentric", "soreness");
+    var pts = S.sorenessLagPairs(doc, LM.evaluateSession);
     var stats = $("scatterStats");
 
     if (!pts.length) {
-      emptyNote(svg, W, H, "Score next-day quad soreness on a session to start this chart");
-      stats.textContent = "0 scored sessions — soreness is entered the morning after, via edit";
+      emptyNote(svg, W, H,
+        "Log a workout, then score soreness in the next morning's check-in");
+      stats.textContent = "0 pairs — each point is yesterday's Ê against this morning's soreness";
       return;
     }
     clear(svg);
@@ -2518,10 +2981,98 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     }
   }
 
+  /* ---- 4. morning readiness ----------------------------------------------- */
+  function drawReadiness() {
+    var svg = $("chReadiness"), W = 900, H = 280, L = 52, R = 48, T = 18, B = 44;
+    var rows = S.readinessSeries(doc, 30);
+    var withData = rows.filter(function (m) {
+      return m.hrv != null || m.restingHr != null || m.sleepScore != null;
+    });
+    if (withData.length < 2) {
+      emptyNote(svg, W, H, "Two morning check-ins will start this chart");
+      return;
+    }
+    clear(svg);
+
+    var hrvs = rows.filter(function (m) { return m.hrv != null; }).map(function (m) { return m.hrv; });
+    var rhrs = rows.filter(function (m) { return m.restingHr != null; }).map(function (m) { return m.restingHr; });
+    var topHrv = niceTop(hrvs.length ? Math.max.apply(null, hrvs) : 100, 40);
+    // Resting HR is banded, not zero-based: a 46-52 range would be invisible
+    // on an axis that starts at 0.
+    var loRhr = rhrs.length ? Math.floor(Math.min.apply(null, rhrs) - 3) : 40;
+    var hiRhr = rhrs.length ? Math.ceil(Math.max.apply(null, rhrs) + 3) : 70;
+    if (hiRhr - loRhr < 8) { hiRhr = loRhr + 8; }
+
+    var Yh = function (v) { return H - B - (v / topHrv) * (H - T - B); };
+    var Yr = function (v) { return H - B - ((v - loRhr) / (hiRhr - loRhr)) * (H - T - B); };
+    var iw = (W - L - R) / rows.length;
+
+    for (var k = 0; k <= 4; k++) {
+      var v = topHrv * k / 4;
+      svg.appendChild(svgEl("line", { x1: L, y1: Yh(v), x2: W - R, y2: Yh(v),
+        stroke: "var(--line)", "stroke-width": 1 }));
+      svg.appendChild(svgEl("text", { x: L - 8, y: Yh(v) + 4, "text-anchor": "end",
+        fill: "var(--aero)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(Math.round(v))));
+    }
+    [loRhr, Math.round((loRhr + hiRhr) / 2), hiRhr].forEach(function (v) {
+      svg.appendChild(svgEl("text", { x: W - R + 8, y: Yr(v) + 4, "text-anchor": "start",
+        fill: "var(--mech)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(v)));
+    });
+
+    // Daily aerobic load behind, so a dip can be read against the day that caused it.
+    var days = {};
+    S.dayRows(doc, LM.evaluateSession).forEach(function (d) { days[d.date] = d.aeL; });
+    var maxAe = Math.max(1, Math.max.apply(null, rows.map(function (m) { return days[m.date] || 0; })));
+    rows.forEach(function (m, i) {
+      var load = days[m.date] || 0;
+      if (load <= 0) return;
+      var h = (load / maxAe) * (H - T - B) * 0.5;
+      svg.appendChild(svgEl("rect", { x: L + iw * i + iw * 0.15, y: H - B - h,
+        width: Math.max(iw * 0.7, 2), height: h, fill: "var(--surface-2)" }));
+    });
+
+    function series(key, Y, colour) {
+      var pts = [];
+      rows.forEach(function (m, i) {
+        if (m[key] == null) return;
+        pts.push({ x: L + iw * (i + 0.5), y: Y(m[key]) });
+      });
+      if (pts.length > 1) {
+        svg.appendChild(svgEl("polyline", {
+          points: pts.map(function (q) { return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" "),
+          fill: "none", stroke: colour, "stroke-width": 2.4,
+          "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      }
+      pts.forEach(function (q) {
+        svg.appendChild(svgEl("circle", { cx: q.x, cy: q.y, r: 3.2, fill: colour }));
+      });
+    }
+    series("hrv", Yh, "var(--aero)");
+    series("restingHr", Yr, "var(--mech)");
+
+    rows.forEach(function (m, i) {
+      if (m.sleepScore == null) return;
+      var cx = L + iw * (i + 0.5);
+      svg.appendChild(svgEl("rect", { x: cx - 3, y: H - B - (m.sleepScore / 10) * 12 - 2,
+        width: 6, height: Math.max((m.sleepScore / 10) * 12, 2),
+        fill: "var(--flag)", rx: 1 }));
+    });
+
+    rows.forEach(function (m, i) {
+      if (rows.length > 12 && i % 3 !== 0) return;
+      svg.appendChild(svgEl("text", { x: L + iw * (i + 0.5), y: H - B + 16,
+        "text-anchor": "middle", fill: "var(--muted)",
+        "font-family": "IBM Plex Mono, monospace", "font-size": 10 }, shortWeek(m.date)));
+    });
+  }
+
   function renderCharts() {
     var weeks = S.weeklySeries(doc, LM.evaluateSession, 16);
     drawWeekly(weeks);
     drawDivergence(weeks);
+    drawReadiness();
     drawScatter();
   }
 
@@ -2625,6 +3176,36 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
   // ------------------------------------------------------------------- wire --
 
+  /**
+   * Run one startup step in isolation.
+   *
+   * A single uncaught throw anywhere in init() stops every addEventListener
+   * that comes after it, so the page renders perfectly and no button works —
+   * a failure with no visible symptom and no way for the user to report it
+   * beyond "nothing happens". That has happened once in this app already.
+   * Isolating each step means a broken step costs you that step, not the
+   * whole application, and it says so on screen.
+   */
+  function step(name, fn) {
+    try {
+      fn();
+    } catch (e) {
+      bootErrors.push(name + ": " + ((e && e.message) || e));
+      if (window.console && console.error) console.error("[init:" + name + "]", e);
+    }
+  }
+  var bootErrors = [];
+
+  function reportBootErrors() {
+    if (!bootErrors.length) return;
+    var el = $("warnBanner");
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = "Part of the app failed to start (" + bootErrors.length +
+      " step" + (bootErrors.length === 1 ? "" : "s") + "): " + bootErrors.join(" · ") +
+      ". Everything else still works; the console has the detail.";
+  }
+
   function init() {
     clearForm();
 
@@ -2647,13 +3228,21 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       $("binIdNote").hidden = false;
     }
 
-    var p = S.profileOf(doc);
-    units = p.units;
-    applyUnitLabels();
-    writeProfile(p);
-
-    refreshLive();
-    render();
+    step("profile", function () {
+      var p = S.profileOf(doc);
+      units = p.units;
+      applyUnitLabels();
+      writeProfile(p);
+    });
+    step("morning form", function () {
+      $("mDate").value = new Date().toISOString().slice(0, 10);
+      var today = S.morningFor(doc, $("mDate").value);
+      if (today) writeMorning(today);
+      syncMorningForm();
+    });
+    step("sport", function () { setSport("run"); });
+    step("readouts", refreshLive);
+    step("render", render);
 
     if (S.configured(cfg())) {
       say("syncNote", "Checking the bin…", "");
@@ -2667,6 +3256,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
     $("unitMetric").addEventListener("click", function () { setUnits("metric"); });
     $("unitImperial").addEventListener("click", function () { setUnits("imperial"); });
+    $("sportRun").addEventListener("click", function () { setSport("run"); });
+    $("sportBike").addEventListener("click", function () { setSport("bike"); });
+    $("saveMorning").addEventListener("click", saveMorning);
+    $("mDate").addEventListener("change", function () {
+      var m = S.morningFor(doc, $("mDate").value);
+      if (m) writeMorning(m);
+      syncMorningForm();
+    });
 
     $("save").addEventListener("click", commitSession);
     $("cancelEdit").addEventListener("click", function () {
@@ -2717,6 +3314,10 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       say("syncNote", "Removed " + (before - S.liveSessions(doc).length) +
           " session(s) before " + cutoff + ". Press Sync to write the smaller bin.", "ok");
     });
+
+    // Listeners are attached above this line, so any startup failure reported
+    // here has already been survived rather than having killed the page.
+    reportBootErrors();
   }
 
   function onFieldChange(ev) {
