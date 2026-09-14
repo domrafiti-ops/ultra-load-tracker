@@ -600,6 +600,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         <p class="savenote" id="binIdNote" hidden style="margin-top:5px">Set in the file — edit <code>BIN_ID</code> near the top of the app script to change it.</p></div>
       <div class="f"><label for="accessKey">Access Key <span class="sublab">not the Master Key</span></label><input id="accessKey" type="text" placeholder="$2a$10$…" autocomplete="off" spellcheck="false"></div>
     </div>
+
+    <div class="subsection">
+      <div class="hdr">
+        <span class="disp">Auto-sync</span>
+        <span id="autoSyncHint">on — saving a workout, check-in, edit or delete pushes to the bin</span>
+      </div>
+      <div class="unitpick" role="group" aria-label="Auto-sync">
+        <button type="button" id="autoSyncOn" aria-pressed="true">On</button>
+        <button type="button" id="autoSyncOff" aria-pressed="false">Off</button>
+      </div>
+      <p class="savenote" style="margin-top:9px"><b>Sync now</b> below always works regardless of this setting. Device-level, like the credentials above — stored in this browser only, never in the bin, so two devices can run different settings.</p>
+    </div>
+
     <div class="btnrow">
       <button type="button" class="primary" id="testConn">Test connection</button>
       <button type="button" id="syncNow">Sync now</button>
@@ -2318,13 +2331,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   function cfg() {
     return {
       binId: S.cleanBinId(($("binId") && $("binId").value) || ""),
-      accessKey: S.cleanKey(($("accessKey") && $("accessKey").value) || "")
+      accessKey: S.cleanKey(($("accessKey") && $("accessKey").value) || ""),
+      // Rides along with the credentials into S.saveLocal/loadLocal — same
+      // local-only treatment, never sent to JSONBin.
+      autoSync: autoSync
     };
   }
   var editingId = null;
   var syncing = false;
   var units = "metric";
   var sport = "run";
+  // Device-level, like the credentials it sits beside — see cfg() and the
+  // "Auto-sync" note in the Sync & storage panel. Never written into the bin.
+  var autoSync = true;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -2501,6 +2520,25 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     refreshLive();
   }
 
+  // -------------------------------------------------------------- auto-sync --
+
+  /**
+   * On by default — matches the behaviour every save already had before this
+   * toggle existed, so upgrading changes nothing until someone opts out.
+   * Off means commitSession(), saveMorning() and removeSession() skip their
+   * pushRemote() call; "Sync now" and "Pull from bin" still work either way.
+   */
+  function setAutoSync(next, opts) {
+    var o = opts || {};
+    autoSync = !!next;
+    $("autoSyncOn").setAttribute("aria-pressed", String(autoSync));
+    $("autoSyncOff").setAttribute("aria-pressed", String(!autoSync));
+    $("autoSyncHint").textContent = autoSync
+      ? "on — saving a workout, check-in, edit or delete pushes to the bin"
+      : "off — changes stay local until you press Sync now";
+    if (!o.silent) persist();
+  }
+
   // ---------------------------------------------------------------- morning --
 
   function readMorning() {
@@ -2580,7 +2618,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     render();
     say("mornNote", "Check-in saved for " + m.date + ".", "ok");
     syncMorningForm();
-    pushRemote("check-in");
+    if (autoSync) pushRemote("check-in");
   }
 
   function readSession() {
@@ -3005,7 +3043,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     render();
     note(wasEdit ? "Updated " + s.date + "." :
       "Logged " + s.date + " — " + S.liveSessions(doc).length + " sessions stored.", "ok");
-    pushRemote(wasEdit ? "edit" : "new session");
+    if (autoSync) pushRemote(wasEdit ? "edit" : "new session");
   }
 
   function beginEdit(id) {
@@ -3043,7 +3081,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     persist();
     render();
     note("Deleted. A tombstone is kept so the delete survives syncing.", "ok");
-    pushRemote("delete");
+    if (autoSync) pushRemote("delete");
   }
 
   // -------------------------------------------------------------------- csv --
@@ -3549,6 +3587,10 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     clearForm();
 
     var saved = S.loadLocal();
+    // Default true (matches the always-on behaviour every save had before
+    // this toggle existed) unless a previous session explicitly turned it
+    // off — an absent key must not read as "off".
+    var initialAutoSync = !(saved && saved.config && saved.config.autoSync === false);
     if (saved) {
       doc = saved.doc;
       dirty = saved.dirty;
@@ -3580,6 +3622,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       syncMorningForm();
     });
     step("sport", function () { setSport("run"); });
+    step("auto-sync", function () { setAutoSync(initialAutoSync, { silent: true }); });
     step("readouts", refreshLive);
     step("render", render);
 
@@ -3629,6 +3672,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
                "application/json");
       note("Raw bin JSON downloaded — paste this into JSONBin to restore.", "ok");
     });
+    $("autoSyncOn").addEventListener("click", function () { setAutoSync(true); });
+    $("autoSyncOff").addEventListener("click", function () { setAutoSync(false); });
     $("syncNow").addEventListener("click", function () { pushRemote("manually"); });
     $("pullNow").addEventListener("click", pullRemote);
     $("testConn").addEventListener("click", testConnection);
