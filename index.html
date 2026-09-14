@@ -210,6 +210,25 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
   .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
   .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
+  /* ---- collapsible settings ---- */
+  details#settings{border:1px solid var(--line); border-radius:3px; background:var(--surface);
+    margin:22px 0 0}
+  details#settings > summary{list-style:none; cursor:pointer; padding:13px 16px;
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-height:44px;
+    font-family:Archivo,sans-serif; -webkit-tap-highlight-color:transparent}
+  details#settings > summary::-webkit-details-marker{display:none}
+  details#settings > summary::after{content:"▸"; margin-left:auto; color:var(--muted);
+    font-size:13px; transition:transform .12s ease}
+  details#settings[open] > summary::after{transform:rotate(90deg)}
+  details#settings > summary:focus-visible{outline:2px solid var(--aero); outline-offset:-2px}
+  .sumTitle{font-weight:600; font-size:14.5px}
+  .sumHint{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted)}
+  details#settings > .panel{border:none; border-top:1px solid var(--line);
+    border-radius:0 0 3px 3px; background:transparent}
+  @media (prefers-reduced-motion: reduce){
+    details#settings > summary::after{transition:none}
+  }
+
   /* ---- day table ---- */
   .sportTag{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.07em;
     text-transform:uppercase; padding:2px 5px; border-radius:2px; margin-right:5px;
@@ -338,6 +357,48 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   </div>
 </header>
 
+<!-- Native <details>: no JavaScript, works on iOS, and survives a scripting
+     failure — a settings panel you cannot open is worse than one always shown. -->
+<details id="settings">
+  <summary>
+    <span class="sumTitle">Settings</span>
+    <span class="sumHint" id="settingsHint">profile · units · bike</span>
+  </summary>
+  <div class="panel">
+    <div class="subsection" style="margin-top:0; padding-top:0; border-top:none">
+      <div class="hdr">
+        <span class="disp">Units</span>
+        <span>display only — everything is stored metric, so switching never changes a stored value</span>
+      </div>
+      <div class="unitpick" role="group" aria-label="Unit system">
+        <button type="button" id="unitMetric" aria-pressed="true">Metric</button>
+        <button type="button" id="unitImperial" aria-pressed="false">Imperial</button>
+      </div>
+    </div>
+    <div class="subsection">
+      <div class="hdr"><span class="disp">You</span></div>
+      <div class="gridauto">
+        <div class="f"><label for="mBody">Body mass <span class="sublab" id="uMass">kg</span></label><input id="mBody" type="number" inputmode="decimal" value="70" step="0.5" min="1"></div>
+        <div class="f"><label for="sex">Sex <span class="sublab">TRIMP constants</span></label><select id="sex"><option value="m">male</option><option value="f">female</option></select></div>
+        <div class="f"><label for="hrMax">HR max</label><input id="hrMax" type="number" inputmode="numeric" value="188" min="100"></div>
+        <div class="f"><label for="hrRest">HR rest</label><input id="hrRest" type="number" inputmode="numeric" value="46" min="25"></div>
+        <div class="f"><label for="sl">Descent step length <span class="sublab" id="uStep">m</span></label><input id="sl" type="number" inputmode="decimal" value="1.05" step="0.05" min="0.1"></div>
+        <div class="f"><label for="km">k<sub>m</sub> <span class="sublab">muscle exponent</span></label><input id="km" type="number" inputmode="decimal" value="1.5" step="0.25" min="1" max="2.5"></div>
+        <div class="f"><label for="kb">k<sub>b</sub> <span class="sublab">bone exponent</span></label><input id="kb" type="number" inputmode="decimal" value="3" step="0.5" min="1" max="6"></div>
+      </div>
+    </div>
+    <div class="subsection">
+      <div class="hdr"><span class="disp">Bike</span><span>applied only to sessions logged as Bike</span></div>
+      <div class="gridauto">
+        <div class="f"><label for="bikeHrMax">Bike HR max <span class="sublab">0 = use running max</span></label><input id="bikeHrMax" type="number" inputmode="numeric" value="0" min="0" max="240"></div>
+        <div class="f"><label for="bikeFactor">Bike AeL factor</label><input id="bikeFactor" type="number" inputmode="decimal" value="1" step="0.05" min="0.1" max="2"></div>
+      </div>
+      <p class="savenote" style="margin-top:10px"><b>The factor defaults to 1.00, not 0.6.</b> AeL is internal load from heart-rate reserve, and at matched %HRR cycling produces <i>more</i> metabolic stress than running, not less. The familiar 0.6 is an external running-specificity conversion — a different question. Set it to 0.6 if that is the question you want answered. The defensible correction is a lower bike HR max, above.</p>
+    </div>
+    <p class="savenote" style="margin-top:12px">Settings travel with the log, so a new device picks them up on first sync.</p>
+  </div>
+</details>
+
 <section id="morning" style="margin-top:0">
   <h2>Morning check-in</h2>
   <div class="panel">
@@ -372,7 +433,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <button type="button" id="sportRun" aria-pressed="true">Run</button>
       <button type="button" id="sportBike" aria-pressed="false">Bike</button>
     </div>
-    <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Cycling has no eccentric phase and no impact cycles, so Ê and B̂ read <b>n/a</b> rather than zero. AeL is unchanged — see Profile for the bike HR max and factor.</p>
+    <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Ascent and descent are recorded for the ride but do <b>not</b> feed the model: climbing is already priced through heart rate, and descending on a bike is coasting — no eccentric muscle work, so Ê and B̂ read <b>n/a</b> rather than zero. Bike HR max and factor live in Settings.</p>
     <div class="corefields" style="margin-top:14px">
       <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
       <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" inputmode="numeric" value="120" step="1" min="1"></div>
@@ -521,37 +582,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 </section>
 
 <section id="profile">
-  <h2>Profile &amp; units</h2>
-  <div class="panel">
-    <div class="subsection" style="margin-top:0; padding-top:0; border-top:none">
-      <div class="hdr">
-        <span class="disp">Units</span>
-        <span>display only — everything is stored metric, so switching never changes a stored value</span>
-      </div>
-      <div class="unitpick" role="group" aria-label="Unit system">
-        <button type="button" id="unitMetric" aria-pressed="true">Metric</button>
-        <button type="button" id="unitImperial" aria-pressed="false">Imperial</button>
-      </div>
-    </div>
-    <div class="gridauto" style="margin-top:16px">
-      <div class="f"><label for="mBody">Body mass <span class="sublab" id="uMass">kg</span></label><input id="mBody" type="number" value="70" step="0.5" min="1"></div>
-      <div class="f"><label for="sex">Sex <span class="sublab">TRIMP constants</span></label><select id="sex"><option value="m">male</option><option value="f">female</option></select></div>
-      <div class="f"><label for="hrMax">HR max</label><input id="hrMax" type="number" value="188" min="100"></div>
-      <div class="f"><label for="hrRest">HR rest</label><input id="hrRest" type="number" value="46" min="25"></div>
-      <div class="f"><label for="sl">Descent step length <span class="sublab" id="uStep">m</span></label><input id="sl" type="number" value="1.05" step="0.05" min="0.1"></div>
-      <div class="f"><label for="km">k<sub>m</sub> <span class="sublab">muscle exponent</span></label><input id="km" type="number" value="1.5" step="0.25" min="1" max="2.5"></div>
-      <div class="f"><label for="kb">k<sub>b</sub> <span class="sublab">bone exponent</span></label><input id="kb" type="number" value="3" step="0.5" min="1" max="6"></div>
-    </div>
-    <div class="subsection">
-      <div class="hdr"><span class="disp">Bike</span><span>used only for sessions logged as Bike</span></div>
-      <div class="gridauto">
-        <div class="f"><label for="bikeHrMax">Bike HR max <span class="sublab">0 = use running max</span></label><input id="bikeHrMax" type="number" inputmode="numeric" value="0" min="0" max="240"></div>
-        <div class="f"><label for="bikeFactor">Bike AeL factor</label><input id="bikeFactor" type="number" inputmode="decimal" value="1" step="0.05" min="0.1" max="2"></div>
-      </div>
-      <p class="savenote" style="margin-top:10px"><b>The factor defaults to 1.00, not 0.6.</b> AeL is internal load from heart-rate reserve, and at matched %HRR cycling produces <i>more</i> metabolic stress than running, not less. The familiar 0.6 is an external running-specificity conversion — a different question. Set it to 0.6 if that is the question you want answered. The correction that is actually defensible is a lower bike HR max, above.</p>
-    </div>
-    <p class="savenote" style="margin-top:12px">The profile travels with the log, so a new device picks it up on first sync.</p>
-  </div>
+  <h2>Profile</h2>
+  <p class="savenote">Moved to <b>Settings</b> at the top of this page.</p>
 </section>
 
 <section id="sync">
@@ -2223,6 +2255,26 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     $("unitMetric").setAttribute("aria-pressed", String(units === "metric"));
     $("unitImperial").setAttribute("aria-pressed", String(units === "imperial"));
     $("unitTag").textContent = units === "metric" ? "Metric" : "Imperial";
+    updateSettingsHint();
+  }
+
+  /**
+   * The collapsed summary carries the settings most likely to be wrong —
+   * body mass and HR max feed every number on the page. Showing them shut
+   * means a mistyped mass is visible without opening anything.
+   */
+  function updateSettingsHint() {
+    var el = $("settingsHint");
+    if (!el) return;
+    try {
+      var p = readProfile();
+      el.textContent = U.format(p.massKg, "mass", units) +
+        " · HR " + Math.round(p.hrRest) + "–" + Math.round(p.hrMax) +
+        " · k" + "ₘ " + p.kMuscle +
+        " · " + (units === "metric" ? "metric" : "imperial");
+    } catch (e) {
+      el.textContent = "profile · units · bike";
+    }
   }
 
   /**
@@ -2302,14 +2354,16 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     $("sportRun").setAttribute("aria-pressed", String(sport === "run"));
     $("sportBike").setAttribute("aria-pressed", String(sport === "bike"));
     $("sportNote").hidden = sport !== "bike";
-    // Elevation and descent cadence have no meaning for a bike ride in this
-    // model, so hide them rather than invite numbers that change nothing.
-    ["fUp", "fDown", "fDmin", "fCad"].forEach(function (id) {
+    // Ascent and descent stay visible for the bike: they are worth recording
+    // even though they do not feed the model. Climb/descent minutes and
+    // descent cadence only exist to compute B̂, which does not apply, so those
+    // are hidden rather than inviting numbers that change nothing.
+    ["fDmin", "fUmin", "fCad"].forEach(function (id) {
       if ($(id)) $(id).hidden = sport === "bike";
     });
     if ($("optHint")) {
       $("optHint").textContent = sport === "bike"
-        ? "RPE and pack weight only — the mechanical channels do not apply"
+        ? "RPE and pack weight — the time split only exists to compute B̂"
         : "descent + climb minutes unlock B̂";
     }
     refreshLive();
@@ -2589,9 +2643,9 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
             (isBike ? "bike" : "run") + "</span> " + esc(s.label) + "</td>" +
           "<td>" + Math.round(s.durationMin) + "</td>" +
           "<td>" + Math.round(s.avgHr) + "</td>" +
-          "<td>" + (isBike ? "—" : U.toDisplay(s.distanceKm || 0, "distance", units).toFixed(dd)) + "</td>" +
-          "<td>" + (isBike ? "—" : Math.round(U.toDisplay(s.ascentM || 0, "elevation", units))) + "</td>" +
-          "<td>" + (isBike ? "—" : Math.round(U.toDisplay(s.descentM || 0, "elevation", units))) + "</td>" +
+          "<td>" + U.toDisplay(s.distanceKm || 0, "distance", units).toFixed(dd) + "</td>" +
+          "<td>" + Math.round(U.toDisplay(s.ascentM || 0, "elevation", units)) + "</td>" +
+          "<td>" + Math.round(U.toDisplay(s.descentM || 0, "elevation", units)) + "</td>" +
           '<td class="ae">' + Math.round(r.aeL) + "</td>" +
           '<td class="me">' + (r.eccentric == null ? "n/a" : (noGrade ? "—" : Math.round(r.eccentric))) + "</td>" +
           '<td class="me">' + (r.cyclic == null ? (isBike ? "n/a" : "—") : Math.round(r.cyclic)) + "</td>" +
@@ -2625,6 +2679,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     renderCorrelations(p);
     renderStorage();
     renderSync();
+    updateSettingsHint();
   }
 
   function renderWeeks() {
