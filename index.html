@@ -349,7 +349,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 <header class="mast">
   <div class="kicker">Two-channel ultra load tracker · daily instrument</div>
   <h1>Load Log</h1>
-  <p class="standfirst">Enter five numbers after a run — duration, average heart rate, distance, ascent, descent — and get both load values. History syncs to your JSONBin bin so every device sees the same log, and exports to CSV whenever you want it elsewhere.</p>
+  <p class="standfirst">Five numbers after a run — duration, average heart rate, distance, ascent, descent — give you both load values. Everything syncs to one bin, so every device sees the same log.</p>
   <div class="meta">
     <span class="tag" id="syncTag"><span class="dot off"></span>Sync: local only</span>
     <span class="tag">Stores inputs, derives outputs</span>
@@ -368,7 +368,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <div class="subsection" style="margin-top:0; padding-top:0; border-top:none">
       <div class="hdr">
         <span class="disp">Units</span>
-        <span>display only — everything is stored metric, so switching never changes a stored value</span>
+        <span>display only — everything is stored metric</span>
       </div>
       <div class="unitpick" role="group" aria-label="Unit system">
         <button type="button" id="unitMetric" aria-pressed="true">Metric</button>
@@ -393,9 +393,9 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         <div class="f"><label for="bikeHrMax">Bike HR max <span class="sublab">0 = use running max</span></label><input id="bikeHrMax" type="number" inputmode="numeric" value="0" min="0" max="240"></div>
         <div class="f"><label for="bikeFactor">Bike AeL factor</label><input id="bikeFactor" type="number" inputmode="decimal" value="1" step="0.05" min="0.1" max="2"></div>
       </div>
-      <p class="savenote" style="margin-top:10px"><b>The factor defaults to 1.00, not 0.6.</b> AeL is internal load from heart-rate reserve, and at matched %HRR cycling produces <i>more</i> metabolic stress than running, not less. The familiar 0.6 is an external running-specificity conversion — a different question. Set it to 0.6 if that is the question you want answered. The defensible correction is a lower bike HR max, above.</p>
+      <p class="savenote" style="margin-top:10px"><b>The factor defaults to 1.00, not 0.6.</b> At matched %HRR cycling produces <i>more</i> metabolic stress than running, not less; the familiar 0.6 answers a different question (external running specificity). Set it to 0.6 if that is the question you want. The defensible correction is a lower bike HR max, above.</p>
     </div>
-    <p class="savenote" style="margin-top:12px">Settings travel with the log, so a new device picks them up on first sync.</p>
+    <p class="savenote" style="margin-top:12px">Settings travel with the log. Body mass applies to new sessions only — past ones keep the mass they were logged at.</p>
   </div>
 </details>
 
@@ -417,6 +417,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     </div>
     <div class="f" style="margin-top:12px"><label for="mNotes">Sleep notes</label>
       <input id="mNotes" type="text" class="serif" placeholder="woke at 3, hot room"></div>
+    <p class="savenote" id="hrvBase" hidden style="margin:12px 0 0"></p>
     <div class="btnrow">
       <button type="button" class="primary" id="saveMorning">Save check-in</button>
       <span class="savenote" id="mornNote"></span>
@@ -433,7 +434,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <button type="button" id="sportRun" aria-pressed="true">Run</button>
       <button type="button" id="sportBike" aria-pressed="false">Bike</button>
     </div>
-    <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Ascent and descent are recorded for the ride but do <b>not</b> feed the model: climbing is already priced through heart rate, and descending on a bike is coasting — no eccentric muscle work, so Ê and B̂ read <b>n/a</b> rather than zero. Bike HR max and factor live in Settings.</p>
+    <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Ascent and descent are recorded but do <b>not</b> feed the model: climbing is already priced through heart rate, and descending is coasting. Ê and B̂ read <b>n/a</b>, not zero.</p>
     <div class="corefields" style="margin-top:14px">
       <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
       <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" inputmode="numeric" value="120" step="1" min="1"></div>
@@ -459,6 +460,11 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <!-- Soreness moved to the morning check-in. Kept hidden so any stale
            reference reads an empty string rather than throwing. -->
       <input id="sore" type="hidden" value="">
+      <!-- Body mass on the day, in kg, stamped from the profile when the
+           session is saved and carried unchanged when it is edited. Hidden
+           because asking for it every time would be friction for a number
+           that changes monthly, and it is not a judgement call. -->
+      <input id="sMass" type="hidden" value="">
     </div>
 
     <div class="readout">
@@ -471,6 +477,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
     <div class="btnrow">
       <button type="button" class="primary" id="save">Add to log</button>
+      <button type="button" id="repeatLast">Repeat last</button>
       <button type="button" id="cancelEdit" hidden>Cancel edit</button>
       <button type="button" id="dlCsv">Download CSV</button>
       <button type="button" id="copyCsv">Copy CSV</button>
@@ -494,19 +501,22 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     </table>
     <div class="empty" id="logEmpty">Nothing logged yet. Save a morning check-in or a workout above.</div>
   </div>
-  <p class="savenote" style="margin-top:10px">Loads are recomputed from your profile on every render, never stored — so changing <code>k<sub>m</sub></code> re-prices the whole history.</p>
+  <p class="savenote" style="margin-top:10px">Loads are recomputed on every render, never stored — so changing <code>k<sub>m</sub></code> re-prices the whole history. Body mass is the exception: each session keeps the mass it was logged at.</p>
 
   <div class="rolling">
     <div class="rcard a"><div class="k">AeL · last 7 days</div><div class="v" id="r7a">—</div><div class="n" id="r7an">—</div></div>
     <div class="rcard m"><div class="k">Ê · last 7 days</div><div class="v" id="r7m">—</div><div class="n" id="r7mn">—</div></div>
-    <div class="rcard a"><div class="k">AeL · days 8–14</div><div class="v" id="p7a">—</div><div class="n">prior week</div></div>
-    <div class="rcard m"><div class="k">Ê · days 8–14</div><div class="v" id="p7m">—</div><div class="n">prior week</div></div>
+    <div class="rcard a"><div class="k">AeL vs baseline</div><div class="v" id="rbA">—</div><div class="n" id="rbAn">needs 3 prior weeks</div></div>
+    <div class="rcard m"><div class="k">Ê vs baseline</div><div class="v" id="rbE">—</div><div class="n" id="rbEn">needs 3 prior weeks</div></div>
+    <div class="rcard m"><div class="k">Descent · last 28 days</div><div class="v" id="rD28">—</div><div class="n" id="rD28n">running descent only</div></div>
   </div>
+  <p class="savenote" style="margin-top:12px"><b>Baseline is the three weeks <i>before</i> this one</b>, not the last 28 days — the usual acute:chronic ratio puts the current week inside its own denominator, and that coupling is the heart of the published criticism of the metric. <b>No safe zone is shown, deliberately:</b> the threshold bands you have seen elsewhere have largely failed to replicate, so a number is honest and a verdict would not be.</p>
+  <p class="savenote"><b>Descent over 28 days is context for Ê, not part of it.</b> A damaging descent confers weeks of protection against the next one, so the same 1000&nbsp;m means less to tissue in week 8 of a mountain block than in week 1. That effect is real and well replicated, but calibrating it to you would need data this tool does not have — so it is shown beside Ê for you to read, rather than folded in as a coefficient invented for the purpose.</p>
 </section>
 
 <section id="weeks">
   <h2>Weekly rollup</h2>
-  <p class="lede">The historical reference view. Weeks start Monday. <b>Divergence</b> is Ê ÷ AeL — rising means your training is turning descent-dominant, falling means you are accumulating aerobic work without mechanical specificity.</p>
+  <p class="lede">Weeks start Monday. <b>Divergence</b> is Ê ÷ AeL — rising means training is turning descent-dominant, falling means aerobic work without mechanical specificity.</p>
   <div class="tblwrap">
     <table class="log">
       <thead><tr>
@@ -523,7 +533,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <figure class="chart">
       <figcaption>
         <b>Weekly load, both channels</b>
-        <span>Bars are weekly totals. The line is mean next-day quad soreness on its own scale — <b>watch which set of bars it follows.</b> If soreness rides Ê, the eccentric channel is tracking your tissue response and the model is working on you.</span>
+        <span>Bars are weekly totals; the line is mean next-day soreness on its own scale. <b>Watch which set of bars it follows.</b> If soreness rides Ê, the eccentric channel is tracking your tissue response.</span>
       </figcaption>
       <div class="chartbox"><svg id="chWeekly" viewBox="0 0 900 300" width="100%" height="300" role="img" aria-label="Weekly aerobic and eccentric load with mean soreness overlaid"></svg></div>
       <div class="legend">
@@ -537,7 +547,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <figure class="chart">
       <figcaption>
         <b>Divergence and ramp</b>
-        <span>Divergence is Ê ÷ AeL per week — rising means training is turning descent-dominant. Bars behind it are week-over-week change in Ê: <b>a spike is a bigger injury signal than a high absolute week.</b></span>
+        <span>The line is Ê ÷ AeL per week. Bars behind it are week-over-week change in Ê: <b>a spike is a bigger injury signal than a high absolute week.</b></span>
       </figcaption>
       <div class="chartbox"><svg id="chDiverge" viewBox="0 0 900 260" width="100%" height="260" role="img" aria-label="Weekly divergence ratio and week over week change in eccentric load"></svg></div>
       <div class="legend">
@@ -549,11 +559,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <figure class="chart">
       <figcaption>
         <b>Morning readiness</b>
-        <span>HRV and resting heart rate from the check-in, with sleep score. Bars behind them are that day's aerobic load — <b>look for HRV dropping and resting HR rising in the days after a big bar.</b></span>
+        <span>HRV against its own rolling baseline, with resting heart rate and sleep. <b>Read the shaded band, not the raw line</b> — a single HRV reading is mostly noise, so what is interpretable is the baseline moving or a morning falling outside its own recent spread. Bars behind are that day's aerobic load.</span>
       </figcaption>
-      <div class="chartbox"><svg id="chReadiness" viewBox="0 0 900 280" width="100%" height="280" role="img" aria-label="HRV, resting heart rate and sleep score over time against daily aerobic load"></svg></div>
+      <div class="chartbox"><svg id="chReadiness" viewBox="0 0 900 280" width="100%" height="280" role="img" aria-label="HRV with its seven day rolling baseline band, resting heart rate and sleep score against daily aerobic load"></svg></div>
       <div class="legend">
         <span><i style="background:var(--aero); height:3px"></i>HRV (left)</span>
+        <span><i style="background:var(--aero); opacity:.35"></i>7-day mean ±1 SD</span>
         <span><i style="background:var(--mech); height:3px"></i>resting HR (right)</span>
         <span><i style="background:var(--flag)"></i>sleep 0–10</span>
         <span><i style="background:var(--surface-2)"></i>daily AeL</span>
@@ -563,7 +574,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <figure class="chart">
       <figcaption>
         <b>Does Ê predict your soreness?</b>
-        <span id="scatterCaption">One dot per scored session. This is the calibration question — a strong positive slope means the eccentric channel describes <i>your</i> body, not the literature's average one. A weak one points at <code>k<sub>m</sub></code> or your descent step length, never at the descent metres.</span>
+        <span id="scatterCaption">One dot per scored session. A strong positive slope means the eccentric channel describes <i>your</i> body, not the literature's average one.</span>
       </figcaption>
       <div class="chartbox"><svg id="chScatter" viewBox="0 0 900 320" width="100%" height="320" role="img" aria-label="Eccentric load against next day soreness, one point per session"></svg></div>
       <div class="legend"><span id="scatterStats">needs 5 scored sessions before a line is drawn</span></div>
@@ -573,17 +584,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
 <section id="calib">
   <h2>Calibrating to you</h2>
-  <p class="lede">Two coefficients in the model are assumptions rather than measurements. These correlations are how you find out whether they fit you. Full procedure in <a href="docs/ANALYSIS.md">docs/ANALYSIS.md</a>.</p>
+  <p class="lede">Two coefficients are assumptions rather than measurements. These correlations are how you find out whether they fit you — procedure in <a href="docs/ANALYSIS.md">docs/ANALYSIS.md</a>.</p>
   <div class="rolling">
     <div class="rcard m"><div class="k">Ê vs next-day soreness</div><div class="v" id="cSore">—</div><div class="n" id="cSoreN">needs 5+ scored sessions</div></div>
     <div class="rcard a"><div class="k">AeL vs RPE</div><div class="v" id="cRpe">—</div><div class="n" id="cRpeN">needs 5+ scored sessions</div></div>
   </div>
-  <p class="savenote" style="margin-top:12px">A weak correlation points at <code>k<sub>m</sub></code> or your descent step length — never at the descent metres, which are measured. Rule of thumb at your settings: <b><span id="ruleOfThumb">—</span></b>.</p>
-</section>
-
-<section id="profile">
-  <h2>Profile</h2>
-  <p class="savenote">Moved to <b>Settings</b> at the top of this page.</p>
+  <p class="savenote" style="margin-top:12px">A weak correlation points at <code>k<sub>m</sub></code> or your descent step length — never at the descent metres, which are measured. Rule of thumb: <b><span id="ruleOfThumb">—</span></b>.</p>
 </section>
 
 <section id="sync">
@@ -607,12 +613,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <span class="savenote">No key values are included — safe to paste when asking for help.</span>
     </div>
 
-    <div class="callout">
-      <h4>If the Access Key is being rejected</h4>
-      <p><b>A newly created Access Key has no permissions at all until you grant them</b> — creating the key is not the same as enabling it. In JSONBin go to <b>API Keys</b>, open your key, and tick both <b>Bins Read</b> and <b>Bins Update</b>. The tracker needs both: Read to load the log, Update to save it.</p>
-      <p><b>Read and write are separate permissions.</b> With only Bins Read, loading the log works and every save fails — so any test that checks only the read can pass while the app still cannot sync. Press <b>Test connection</b>: it probes both and names which one failed.</p>
-      <p>If <b>Bins Update</b> is genuinely granted and writes are still refused, the cause is probably not the key. The app sends <code>X-Bin-Versioning</code> on writes, and a custom header on a <code>PUT</code> has to survive a CORS preflight; if it does not, the browser blocks the request before it leaves — which looks exactly like a rejected key. <b>The app now retries once without that header automatically</b> and tells you if that is what fixed it. The <a href="tools/jsonbin-doctor.html">sync doctor</a> shows the raw HTTP status and JSONBin's own wording for every call.</p>
-    </div>
+    <p class="savenote" style="margin-top:14px">Key rejected? It needs <b>Bins Read</b> and <b>Bins Update</b> ticked in JSONBin — a new key has neither by default. <b>Test connection</b> probes both and names which failed; the <a href="tools/jsonbin-doctor.html">sync doctor</a> and <a href="docs/JSONBIN-SETUP.md">setup notes</a> have the rest.</p>
 
     <div class="subsection">
       <div class="hdr"><span class="disp">Bin size</span><span>JSONBin's free tier rejects any bin over 100 KB</span></div>
@@ -623,18 +624,15 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         <div class="f"><label for="archiveDate">Archive sessions before</label><input id="archiveDate" type="date"></div>
         <div class="f" style="display:flex; align-items:flex-end"><button type="button" id="archive">Trim log to this cutoff</button></div>
       </div>
-      <p class="savenote">Download CSV first — archiving is not reversible from inside the app. Bin versioning is on for every write, so JSONBin also keeps up to 1000 prior versions you can restore from its dashboard.</p>
+      <p class="savenote">Download CSV first — archiving is not reversible here. JSONBin keeps up to 1000 prior versions of the bin regardless.</p>
     </div>
 
-    <div class="callout">
-      <h4>What the Access Key protects, and what it does not</h4>
-      <p>This is a static site, so the key you paste lives in your browser's local storage and is visible to anyone with your browser or devtools. That is why it must be an <b>Access Key</b> scoped to Bins Read + Bins Update — never your Master Key, which can create and delete every bin on your account. Someone who extracted this key could read or overwrite this one training log. For a personal training log that is an acceptable trade; do not put anything else in the bin.</p>
-    </div>
+    <p class="savenote" style="margin-top:14px"><b>Use an Access Key, never your Master Key.</b> Static hosting cannot hold a secret, so whatever you paste here sits in this browser's local storage. Scoped to Read + Update on bins, the worst case is that one training log is exposed — so keep the bin to training data and nothing else.</p>
   </div>
 </section>
 
 <footer>
-  Model derivation, coefficient provenance and the evidence ledger are in <a href="model.html">The Model</a>. Formulas, unit conversion and storage live in the three <code>mod-*</code> script blocks inside this file, and <a href="tests/index.html">217 assertions</a> run against those exact blocks. Not medical advice — a load model does not replace judgement about pain, injury or illness.
+  Derivation, coefficient provenance and the evidence ledger are in <a href="model.html">The Model</a>. Formulas, units and storage live in the three <code>mod-*</code> script blocks in this file, and the <a href="tests/index.html">test suite</a> runs against those exact blocks. Not medical advice — a load model does not replace judgement about pain, injury or illness.
 </footer>
 
 </div>
@@ -937,7 +935,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   /**
    * Evaluate one logged session.
    * session: { durationMin, avgHr, distanceKm, ascentM, descentM,
-   *            packKg?, descentMin?, climbMin?, cadenceSpm? }
+   *            packKg?, descentMin?, climbMin?, cadenceSpm?, massKg? }
    * profile: { massKg, male, hrMax, hrRest, descentStepLengthM?,
    *            kMuscle?, kBone?, cadenceSpm? }
    */
@@ -952,19 +950,40 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
    */
   var NO_MECHANICAL = { bike: true };
 
+  /** Shallow copy with fields replaced. Keeps the caller's profile untouched. */
+  function withOverrides(p, over) {
+    var out = {};
+    Object.keys(p).forEach(function (k) { out[k] = p[k]; });
+    Object.keys(over).forEach(function (k) { out[k] = over[k]; });
+    return out;
+  }
+
   function evaluateSession(session, profile) {
     var sport = session.sport === "bike" ? "bike" : "run";
     var p = profile || {};
+    var over = {};
 
     // Maximal heart rate is typically lower on a bike than running, so using a
     // running HR max on the bike inflates the reserve span and UNDER-states
     // cycling intensity. A sport-specific max fixes that at the source rather
     // than patching the output with a fudge factor.
-    if (sport === "bike" && p.bikeHrMax > 0) {
-      var swapped = {};
-      Object.keys(p).forEach(function (k) { swapped[k] = p[k]; });
-      swapped.hrMax = p.bikeHrMax;
-      p = swapped;
+    if (sport === "bike" && p.bikeHrMax > 0) over.hrMax = p.bikeHrMax;
+
+    // Body mass AS IT WAS on the day, when the session recorded it.
+    //
+    // Every other profile field is a model PARAMETER — re-fitting k_m should
+    // and does re-price the whole history. Body mass is not a parameter, it is
+    // a measurement that was true on a date. Ê scales with m^1.5, so letting
+    // the profile drive it retroactively means stepping on a scale 3 kg lighter
+    // silently restates every past session by about 6.5 %, and a race-weight
+    // drop would rewrite your winter block as easier than you lived it.
+    //
+    // Sessions written before this field existed carry no mass and fall through
+    // to the profile, which is the best available answer for them.
+    if (session.massKg > 0) over.massKg = session.massKg;
+
+    if (over.hrMax !== undefined || over.massKg !== undefined) {
+      p = withOverrides(p, over);
     }
 
     var a = aerobicLoadSimple(session, p);
@@ -1228,6 +1247,10 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     id: "i", date: "d", label: "n", durationMin: "t", avgHr: "h",
     distanceKm: "k", ascentM: "u", descentM: "w", packKg: "p",
     descentMin: "dm", climbMin: "cm", cadenceSpm: "c",
+    // Body mass on the day. Stamped automatically from the profile at save
+    // time, so there is no field to fill in. It lives on the session and not
+    // only on the profile because Ê scales with m^1.5 — see evaluateSession.
+    massKg: "bm",
     // `soreness` is retained on the session for backwards compatibility with
     // logs written before the morning check-in existed. New entries put it on
     // the morning instead; readers fall back to this one for old rows.
@@ -1453,9 +1476,44 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return out;
   }
 
-  /** HRV / resting HR / sleep over time, oldest first, for the readiness chart. */
+  /**
+   * HRV / resting HR / sleep over time, oldest first, for the readiness chart.
+   *
+   * Each row is annotated with a TRAILING 7-DAY MEAN AND SD of HRV, because a
+   * single HRV reading is close to uninterpretable on its own: day-to-day
+   * variation in healthy athletes is large enough that one low morning is
+   * usually noise. The HRV-guided-training literature works off rolling weekly
+   * means for exactly this reason. What is readable is the mean moving, or a
+   * reading falling outside its own recent spread.
+   *
+   * Requires 3 readings before it will report a baseline, and uses the sample
+   * SD (n−1) — at n = 3 the population form understates the spread enough to
+   * make ordinary mornings look unusual.
+   *
+   * Computed over the FULL history before the display window is applied, so
+   * the leftmost visible day still has its preceding week behind it.
+   */
   function readinessSeries(doc, limit) {
     var rows = liveMornings(normalise(doc)).slice().reverse();
+    var WINDOW = 7, MIN_N = 3;
+    rows.forEach(function (r, i) {
+      var vals = [], j;
+      for (j = Math.max(0, i - (WINDOW - 1)); j <= i; j++) {
+        if (rows[j].hrv != null) vals.push(Number(rows[j].hrv));
+      }
+      r.hrvN = vals.length;
+      r.hrvMean = null;
+      r.hrvSd = null;
+      r.hrvZ = null;
+      if (vals.length < MIN_N) return;
+      var sum = 0, k;
+      for (k = 0; k < vals.length; k++) sum += vals[k];
+      var mean = sum / vals.length, ss = 0;
+      for (k = 0; k < vals.length; k++) ss += (vals[k] - mean) * (vals[k] - mean);
+      r.hrvMean = mean;
+      r.hrvSd = Math.sqrt(ss / (vals.length - 1));
+      if (r.hrv != null && r.hrvSd > 0) r.hrvZ = (Number(r.hrv) - mean) / r.hrvSd;
+    });
     if (limit && rows.length > limit) rows = rows.slice(rows.length - limit);
     return rows;
   }
@@ -1564,6 +1622,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     [["avgHr", 240, "Average heart rate"], ["durationMin", 6000, "Duration"],
      ["distanceKm", 1000, "Distance"], ["ascentM", 40000, "Ascent"],
      ["descentM", 40000, "Descent"], ["packKg", 60, "Pack weight"],
+     ["massKg", 300, "Body mass"],
      ["rpe", 10, "RPE"], ["soreness", 10, "Soreness"]].forEach(function (x) {
       var v = toNum(s[x[0]]);
       if (v != null && (v < 0 || v > x[1])) {
@@ -1625,10 +1684,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var d = U ? U.label("distance", system) : "km";
     var e = U ? U.label("elevation", system) : "m";
     var m = U ? U.label("mass", system) : "kg";
+    // New columns go on the END, never in the middle: docs/ANALYSIS.md gives
+    // spreadsheet formulas by column letter, and inserting would silently
+    // break every one of them in files people already have.
     return ["date", "label", "duration_min", "avg_hr", "distance_" + d,
       "ascent_" + e, "descent_" + e, "pack_" + m, "descent_min", "climb_min",
       "cadence_spm", "rpe", "soreness", "ael_au", "ecc_au", "cyc_au",
-      "mean_descent_grade_pct", "pct_hrr", "edited_at", "id"];
+      "mean_descent_grade_pct", "pct_hrr", "edited_at", "id",
+      "sport", "body_mass_" + m];
   }
   var CSV_HEADERS = csvHeaders("metric", null);
 
@@ -1662,7 +1725,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         s.rpe == null ? "" : s.rpe, s.soreness == null ? "" : s.soreness,
         r1(r.aeL), r1(r.eccentric), r.cyclic == null ? "" : r1(r.cyclic),
         r1(r.meanDescentGrade * 100), r1(r.reserveFraction * 100),
-        toISO(s.editedAt), s.id].map(csvCell).join(",");
+        toISO(s.editedAt), s.id,
+        s.sport || "run",
+        // The mass Ê was actually computed with, so the archive can reproduce
+        // the number. Blank on rows logged before mass was recorded — blank,
+        // not today's mass, because today's mass is not evidence about then.
+        s.massKg > 0 ? disp(s.massKg, "mass") : ""].map(csvCell).join(",");
     });
     return [csvHeaders(sys, U).join(",")].concat(rows).join("\n");
   }
@@ -1718,6 +1786,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var ascCol = pickCol("ascent", ["m", "ft"]);
     var descCol = pickCol("descent", ["m", "ft"]);
     var packCol = pickCol("pack", ["kg", "lb"]);
+    var massCol = pickCol("body_mass", ["kg", "lb"]);
 
     if (col.date === undefined || col.duration_min === undefined || col.avg_hr === undefined) {
       return {
@@ -1756,7 +1825,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         climbMin: toNum(cell(r, col.climb_min)),
         cadenceSpm: toNum(cell(r, col.cadence_spm)),
         rpe: toNum(cell(r, col.rpe)),
-        soreness: toNum(cell(r, col.soreness))
+        soreness: toNum(cell(r, col.soreness)),
+        // Both tolerate absence: files exported before these columns existed
+        // import as running sessions priced at the profile mass, which is the
+        // same answer they gave before.
+        sport: cell(r, col.sport) === "bike" ? "bike" : "run",
+        massKg: metric(r, massCol, "mass") || 0
       };
       var errs = validateSession(s);
       if (errs.length) {
@@ -1886,7 +1960,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   function windowTotals(doc, evaluate, fromDays, toDays, today) {
     var d = normalise(doc), p = profileOf(d);
     var ref = today ? new Date(today) : new Date();
-    var out = { aeL: 0, ecc: 0, count: 0 };
+    var out = { aeL: 0, ecc: 0, count: 0, descentM: 0, ascentM: 0,
+                distanceKm: 0, durationMin: 0, descentSessions: 0 };
     liveSessions(d).forEach(function (s) {
       if (!s.date) return;
       var age = (ref - new Date(s.date + "T12:00:00")) / 86400000;
@@ -1894,10 +1969,67 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         var r = evaluate ? evaluate(s, p) : {};
         out.aeL += r.aeL || 0;
         out.ecc += r.eccentric || 0;
+        out.distanceKm += s.distanceKm || 0;
+        out.ascentM += s.ascentM || 0;
+        out.durationMin += s.durationMin || 0;
+        // Descent metres only count as tissue exposure when they were run.
+        // Coasting down on a bike is not eccentric work, so it must not
+        // inflate the repeated-bout context below.
+        if ((s.sport || "run") !== "bike" && s.descentM > 0) {
+          out.descentM += s.descentM;
+          out.descentSessions++;
+        }
         out.count++;
       }
     });
     return out;
+  }
+
+  /**
+   * Acute load against a chronic baseline, per channel.
+   *
+   * TWO DELIBERATE CHOICES, both of which are the point of this function:
+   *
+   * 1. THE BASELINE EXCLUDES THE ACUTE WEEK. The window is days 7–28, not
+   *    0–28. The familiar acute:chronic ratio puts the last 7 days inside its
+   *    own denominator, which couples numerator and denominator mathematically
+   *    and is the core of the published criticism of that metric (Impellizzeri
+   *    and colleagues; the "sweet spot" thresholds have largely failed to
+   *    replicate). Comparing this week to the three weeks BEFORE it asks a
+   *    clean question instead.
+   *
+   * 2. NO ZONES, NO THRESHOLDS, NO VERDICT. This returns a number and says
+   *    nothing about whether it is safe. Given the state of the evidence, a
+   *    coloured band here would be the tool inventing authority it does not
+   *    have — the same sin as fabricating a B̂ from an average speed.
+   *
+   * The baseline is scaled to a weekly rate so the ratio reads as "this week
+   * versus a typical recent week", which is the only interpretation worth
+   * having. Returns null ratios until there is a baseline to divide by.
+   */
+  function loadBalance(doc, evaluate, today) {
+    var BASE_WEEKS = 3;
+    var acute = windowTotals(doc, evaluate, -1, 7, today);
+    var base = windowTotals(doc, evaluate, 7, 7 + BASE_WEEKS * 7, today);
+    var exposure = windowTotals(doc, evaluate, -1, 28, today);
+    function rate(total) { return total / BASE_WEEKS; }
+    // Named acuteTotal, not `now`: `now` is this module's timestamp function
+    // and shadowing it here would be a trap for whoever edits this next.
+    function ratio(acuteTotal, total) {
+      var weekly = rate(total);
+      return weekly > 0 ? acuteTotal / weekly : null;
+    }
+    return {
+      acute: acute,
+      baseline: base,
+      exposure28: exposure,
+      baselineWeeks: BASE_WEEKS,
+      weeklyAeL: rate(base.aeL),
+      weeklyEcc: rate(base.ecc),
+      aeLRatio: ratio(acute.aeL, base.aeL),
+      eccRatio: ratio(acute.ecc, base.ecc),
+      hasBaseline: base.count > 0
+    };
   }
 
   function correlate(pairs) {
@@ -2134,7 +2266,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     validateSession: validateSession, warnSession: warnSession,
     toCSV: toCSV, parseCSV: parseCSV, sessionsFromCSV: sessionsFromCSV,
     weeklyRollup: weeklyRollup, mondayOf: mondayOf,
-    windowTotals: windowTotals, correlate: correlate,
+    windowTotals: windowTotals, loadBalance: loadBalance, correlate: correlate,
     weeklySeries: weeklySeries, scatterPairs: scatterPairs, linearFit: linearFit,
     loadLocal: loadLocal, saveLocal: saveLocal,
     cleanKey: cleanKey, cleanBinId: cleanBinId,
@@ -2398,6 +2530,45 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       $("mornBanner").textContent =
         "A check-in already exists for " + d + " — saving will replace it.";
     }
+    showHrvBaseline();
+  }
+
+  /**
+   * Put the HRV you are typing in context while you type it.
+   *
+   * A number typed into a box invites comparison with yesterday's number, which
+   * is the comparison least worth making. This shows what the last week looked
+   * like instead, and stays quiet until there are enough readings to say
+   * anything — an SD from two mornings would be theatre.
+   */
+  function showHrvBaseline() {
+    var el = $("hrvBase");
+    if (!el) return;
+    try {
+      var rows = S.readinessSeries(doc, 0);
+      var last = null;
+      rows.forEach(function (r) { if (r.hrvMean != null) last = r; });
+      if (!last) {
+        el.hidden = true;
+        return;
+      }
+      var typed = rawOpt("mHrv");
+      var txt = "Your recent HRV baseline is " + Math.round(last.hrvMean) +
+                " ms, give or take " + Math.max(1, Math.round(last.hrvSd)) +
+                " (" + last.hrvN + " readings).";
+      if (typed != null && last.hrvSd > 0) {
+        var z = (typed - last.hrvMean) / last.hrvSd;
+        txt += Math.abs(z) < 1
+          ? " Today sits inside that ordinary spread."
+          : " Today is " + Math.abs(z).toFixed(1) + " SD " +
+            (z < 0 ? "below" : "above") + " it — worth noticing, not worth " +
+            "acting on alone.";
+      }
+      el.textContent = txt;
+      el.hidden = false;
+    } catch (e) {
+      el.hidden = true;
+    }
   }
   function saveMorning() {
     var m = readMorning();
@@ -2429,6 +2600,10 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       rpe: rawOpt("rpe"),
       soreness: rawOpt("sore"),
       sport: sport,
+      // Editing an old session keeps the mass it was logged at; a new one
+      // takes today's profile mass. Re-stamping on edit would quietly rewrite
+      // history, which is the exact failure this field exists to prevent.
+      massKg: rawOpt("sMass") || mNum("mBody", "mass"),
       editedAt: S.now()
     };
   }
@@ -2446,12 +2621,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     setField("pack", s.packKg || 0, "mass");
     $("rpe").value = s.rpe == null ? "" : s.rpe;
     $("sore").value = s.soreness == null ? "" : s.soreness;
+    $("sMass").value = s.massKg > 0 ? s.massKg : "";
   }
   function clearForm() {
     editingId = null;
     $("date").value = new Date().toISOString().slice(0, 10);
     $("label").value = "";
-    ["dmin", "umin", "cad", "rpe", "sore"].forEach(function (k) { $(k).value = ""; });
+    ["dmin", "umin", "cad", "rpe", "sore", "sMass"].forEach(function (k) { $(k).value = ""; });
     setSport("run");
     setEditMode();
   }
@@ -2461,9 +2637,51 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     $("cancelEdit").hidden = !editing;
     $("editBanner").hidden = !editing;
     if (editing) {
+      // When the stored mass differs from today's, say so. Otherwise the only
+      // way to discover that this row is priced at a different mass is to
+      // notice Ê not matching a mental estimate, which is no way to find out.
+      var held = rawOpt("sMass"), nowMass = mNum("mBody", "mass"), extra = "";
+      if (held > 0 && nowMass > 0 && Math.abs(held - nowMass) >= 0.5) {
+        extra = " Priced at " + U.format(held, "mass", units) +
+                ", the mass recorded on the day — not your current " +
+                U.format(nowMass, "mass", units) + ".";
+      }
       $("editBanner").textContent =
-        "Editing an existing session — the same row will be updated, not duplicated.";
+        "Editing an existing session — the same row will be updated, not duplicated." + extra;
     }
+  }
+
+  /**
+   * Prefill the form from the last session of the current sport.
+   *
+   * Friction is what actually kills a training log — not a missing feature but
+   * re-typing the same loop for the fifth time. This copies the shape of the
+   * session and deliberately does NOT copy: the date (today), the id (a new
+   * row, never an edit of the old one), or RPE and body mass, which are
+   * properties of the day rather than of the route.
+   */
+  function repeatLast() {
+    var prev = null;
+    S.liveSessions(doc).forEach(function (s) {
+      if (prev) return;                       // liveSessions is newest first
+      if ((s.sport || "run") === sport) prev = s;
+    });
+    if (!prev) {
+      note("No previous " + sport + " to copy yet.", "bad");
+      return;
+    }
+    editingId = null;
+    var copy = {};
+    Object.keys(prev).forEach(function (k) { copy[k] = prev[k]; });
+    copy.date = new Date().toISOString().slice(0, 10);
+    copy.rpe = null;
+    copy.soreness = null;
+    copy.massKg = 0;                          // re-stamped from today's profile
+    writeSession(copy);
+    setEditMode();
+    refreshLive();
+    note("Copied “" + prev.label + "” from " + prev.date +
+         ". Adjust anything that differed, then add it.", "ok");
   }
 
   // ------------------------------------------------------------- persistence -
@@ -2680,6 +2898,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     renderStorage();
     renderSync();
     updateSettingsHint();
+    showHrvBaseline();
   }
 
   function renderWeeks() {
@@ -2706,15 +2925,40 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   }
 
   function renderRolling() {
-    var a = S.windowTotals(doc, LM.evaluateSession, -1, 7);
-    var b = S.windowTotals(doc, LM.evaluateSession, 7, 14);
+    var lb = S.loadBalance(doc, LM.evaluateSession);
+    var a = lb.acute;
+
     $("r7a").textContent = Math.round(a.aeL);
     $("r7m").textContent = Math.round(a.ecc);
-    $("p7a").textContent = b.count ? Math.round(b.aeL) : "—";
-    $("p7m").textContent = b.count ? Math.round(b.ecc) : "—";
     $("r7an").textContent = a.count + (a.count === 1 ? " session" : " sessions");
     $("r7mn").textContent = a.ecc > 0 ? (a.ecc / 100).toFixed(1) + "× canonical bout"
                                       : "no descent logged";
+
+    // A ratio against a baseline of zero is not a large ratio, it is an
+    // undefined one. Say "no baseline yet" rather than printing infinity or,
+    // worse, a plausible-looking number built on one stray session.
+    function band(valId, noteId, ratio, weekly) {
+      if (ratio == null) {
+        $(valId).textContent = "—";
+        $(noteId).textContent = lb.hasBaseline ? "no load in the baseline weeks"
+                                               : "needs 3 prior weeks";
+        return;
+      }
+      $(valId).textContent = ratio.toFixed(2) + "×";
+      $(noteId).textContent = "vs " + Math.round(weekly) + "/wk over the prior " +
+                              lb.baselineWeeks + " weeks";
+    }
+    band("rbA", "rbAn", lb.aeLRatio, lb.weeklyAeL);
+    band("rbE", "rbEn", lb.eccRatio, lb.weeklyEcc);
+
+    var d28 = lb.exposure28.descentM;
+    $("rD28").textContent = d28 > 0
+      ? Math.round(U.toDisplay(d28, "elevation", units)).toLocaleString()
+      : "—";
+    $("rD28n").textContent = d28 > 0
+      ? U.label("elevation", units) + " over " + lb.exposure28.descentSessions +
+        (lb.exposure28.descentSessions === 1 ? " run" : " runs")
+      : "no running descent logged";
   }
 
   function renderCorrelations(p) {
@@ -3031,8 +3275,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       stats.textContent = "r = " + fit.r.toFixed(2) + " (" + strength + "), n = " + fit.n +
         (fit.n < 10 ? " — under 10 sessions this is indicative, not conclusive" : "");
     } else {
-      stats.textContent = pts.length + " of 5 scored sessions — no line drawn yet, because a " +
-        "trend through this few points invites a conclusion the data cannot support";
+      stats.textContent = pts.length + " of 5 scored sessions — no line yet, because a trend " +
+        "through this few points invites a conclusion the data cannot support";
     }
   }
 
@@ -3086,6 +3330,46 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       var h = (load / maxAe) * (H - T - B) * 0.5;
       svg.appendChild(svgEl("rect", { x: L + iw * i + iw * 0.15, y: H - B - h,
         width: Math.max(iw * 0.7, 2), height: h, fill: "var(--surface-2)" }));
+    });
+
+    /* ---- HRV baseline band ------------------------------------------------
+     * The rolling mean with a +/-1 SD ribbon. This is the part of the chart
+     * that makes a single HRV number mean anything: on its own a reading of 58
+     * says nothing, but 58 against a baseline of 72 +/- 4 does. Drawn first so
+     * the raw trace sits on top of it.
+     *
+     * Split into contiguous runs, because a gap where you skipped the check-in
+     * is missing data — drawing a ribbon straight across it would assert a
+     * baseline for days that have none.
+     */
+    var runs = [], cur = [];
+    rows.forEach(function (m, i) {
+      if (m.hrvMean == null || !(m.hrvSd >= 0)) {
+        if (cur.length) { runs.push(cur); cur = []; }
+        return;
+      }
+      cur.push({ x: L + iw * (i + 0.5), mean: m.hrvMean, sd: m.hrvSd });
+    });
+    if (cur.length) runs.push(cur);
+
+    runs.forEach(function (run) {
+      if (run.length > 1) {
+        var up = run.map(function (q) {
+          return q.x.toFixed(1) + "," + Yh(Math.min(q.mean + q.sd, topHrv)).toFixed(1);
+        });
+        var down = run.slice().reverse().map(function (q) {
+          return q.x.toFixed(1) + "," + Yh(Math.max(q.mean - q.sd, 0)).toFixed(1);
+        });
+        svg.appendChild(svgEl("polygon", {
+          points: up.concat(down).join(" "),
+          fill: "var(--aero)", "fill-opacity": 0.13, stroke: "none" }));
+        svg.appendChild(svgEl("polyline", {
+          points: run.map(function (q) {
+            return q.x.toFixed(1) + "," + Yh(q.mean).toFixed(1);
+          }).join(" "),
+          fill: "none", stroke: "var(--aero)", "stroke-width": 1.6,
+          "stroke-dasharray": "5 4", "stroke-opacity": 0.75 }));
+      }
     });
 
     function series(key, Y, colour) {
@@ -3321,6 +3605,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     });
 
     $("save").addEventListener("click", commitSession);
+    $("repeatLast").addEventListener("click", repeatLast);
     $("cancelEdit").addEventListener("click", function () {
       clearForm(); refreshLive(); render(); note("Edit cancelled.", "");
     });
