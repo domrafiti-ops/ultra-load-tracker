@@ -210,6 +210,17 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
   .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
   .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
+  .charts{display:grid; gap:26px; margin-top:26px}
+  figure.chart{margin:0}
+  figure.chart figcaption{margin-bottom:11px}
+  figure.chart figcaption b{font-family:Archivo,sans-serif; font-size:15.5px; display:block; margin-bottom:3px}
+  figure.chart figcaption span{font-size:14px; color:var(--muted); display:block; max-width:78ch}
+  .chartbox{background:var(--surface); border:1px solid var(--line); border-radius:3px;
+    padding:14px 12px 8px; overflow-x:auto}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace;
+    font-size:11.5px; color:var(--muted); margin-top:7px}
+  .legend i{display:inline-block; width:14px; height:10px; vertical-align:-1px;
+    margin-right:5px; border-radius:1px}
   pre#diag{background:var(--surface-2); border:1px solid var(--line); border-radius:3px;
     padding:12px 14px; font-family:"IBM Plex Mono",monospace; font-size:12.5px;
     line-height:1.55; overflow-x:auto; white-space:pre-wrap; word-break:break-word;
@@ -349,6 +360,43 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <tbody id="weekBody"></tbody>
     </table>
     <div class="empty" id="weekEmpty">Log a session to start the weekly history.</div>
+  </div>
+
+  <div class="charts">
+    <figure class="chart">
+      <figcaption>
+        <b>Weekly load, both channels</b>
+        <span>Bars are weekly totals. The line is mean next-day quad soreness on its own scale — <b>watch which set of bars it follows.</b> If soreness rides Ê, the eccentric channel is tracking your tissue response and the model is working on you.</span>
+      </figcaption>
+      <div class="chartbox"><svg id="chWeekly" viewBox="0 0 900 300" width="100%" height="300" role="img" aria-label="Weekly aerobic and eccentric load with mean soreness overlaid"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--aero)"></i>AeL — aerobic</span>
+        <span><i style="background:var(--mech)"></i>Ê — eccentric</span>
+        <span><i style="background:var(--flag); height:3px"></i>mean soreness (right axis, 0–10)</span>
+        <span><i style="background:var(--muted); height:2px"></i>Ê = 100 · one canonical damaging bout</span>
+      </div>
+    </figure>
+
+    <figure class="chart">
+      <figcaption>
+        <b>Divergence and ramp</b>
+        <span>Divergence is Ê ÷ AeL per week — rising means training is turning descent-dominant. Bars behind it are week-over-week change in Ê: <b>a spike is a bigger injury signal than a high absolute week.</b></span>
+      </figcaption>
+      <div class="chartbox"><svg id="chDiverge" viewBox="0 0 900 260" width="100%" height="260" role="img" aria-label="Weekly divergence ratio and week over week change in eccentric load"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--ink-2); height:3px"></i>divergence Ê ÷ AeL</span>
+        <span><i style="background:var(--mech-soft)"></i>Ê change vs prior week</span>
+      </div>
+    </figure>
+
+    <figure class="chart">
+      <figcaption>
+        <b>Does Ê predict your soreness?</b>
+        <span id="scatterCaption">One dot per scored session. This is the calibration question — a strong positive slope means the eccentric channel describes <i>your</i> body, not the literature's average one. A weak one points at <code>k<sub>m</sub></code> or your descent step length, never at the descent metres.</span>
+      </figcaption>
+      <div class="chartbox"><svg id="chScatter" viewBox="0 0 900 320" width="100%" height="320" role="img" aria-label="Eccentric load against next day soreness, one point per session"></svg></div>
+      <div class="legend"><span id="scatterStats">needs 5 scored sessions before a line is drawn</span></div>
+    </figure>
   </div>
 </section>
 
@@ -1405,6 +1453,63 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     });
   }
 
+  /**
+   * Weeks oldest-first with week-over-week deltas, for charting.
+   * Pure: takes the doc, returns numbers. The drawing code does no arithmetic
+   * beyond scaling, which keeps the interesting part testable.
+   */
+  function weeklySeries(doc, evaluate, limit) {
+    var weeks = weeklyRollup(doc, evaluate).slice().reverse();   // oldest first
+    if (limit && weeks.length > limit) weeks = weeks.slice(weeks.length - limit);
+    weeks.forEach(function (w, i) {
+      var prev = i > 0 ? weeks[i - 1] : null;
+      w.aeLDelta = prev && prev.aeL > 0 ? (w.aeL - prev.aeL) / prev.aeL : null;
+      w.eccDelta = prev && prev.ecc > 0 ? (w.ecc - prev.ecc) / prev.ecc : null;
+    });
+    return weeks;
+  }
+
+  /**
+   * One point per scored session, for the calibration scatter.
+   * `xKey` is a field of the evaluated result, `yKey` a field of the session.
+   */
+  function scatterPairs(doc, evaluate, xKey, yKey) {
+    var d = normalise(doc), p = profileOf(d), out = [];
+    liveSessions(d).forEach(function (s) {
+      if (s[yKey] == null) return;
+      var r = evaluate ? evaluate(s, p) : {};
+      var x = r[xKey];
+      if (typeof x !== "number" || !isFinite(x)) return;
+      out.push({ x: x, y: s[yKey], date: s.date, label: s.label });
+    });
+    return out;
+  }
+
+  /**
+   * Least-squares fit. Returns null when there is too little to say anything —
+   * deliberately, because a trend line through four points invites a conclusion
+   * the data cannot support.
+   */
+  function linearFit(points, minN) {
+    var n = points.length;
+    var need = minN == null ? 5 : minN;
+    if (n < need) return null;
+    var mx = 0, my = 0, i;
+    for (i = 0; i < n; i++) { mx += points[i].x; my += points[i].y; }
+    mx /= n; my /= n;
+    var sxy = 0, sxx = 0, syy = 0;
+    for (i = 0; i < n; i++) {
+      var dx = points[i].x - mx, dy = points[i].y - my;
+      sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+    }
+    if (sxx === 0 || syy === 0) return null;
+    var slope = sxy / sxx;
+    return {
+      slope: slope, intercept: my - slope * mx,
+      r: sxy / Math.sqrt(sxx * syy), n: n
+    };
+  }
+
   function mondayOf(isoDate) {
     var dt = new Date(String(isoDate).slice(0, 10) + "T12:00:00Z");
     var dow = (dt.getUTCDay() + 6) % 7;
@@ -1659,6 +1764,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     toCSV: toCSV, parseCSV: parseCSV, sessionsFromCSV: sessionsFromCSV,
     weeklyRollup: weeklyRollup, mondayOf: mondayOf,
     windowTotals: windowTotals, correlate: correlate,
+    weeklySeries: weeklySeries, scatterPairs: scatterPairs, linearFit: linearFit,
     loadLocal: loadLocal, saveLocal: saveLocal,
     cleanKey: cleanKey, cleanBinId: cleanBinId,
     configured: configured, remoteRead: remoteRead, remoteWrite: remoteWrite,
@@ -2067,6 +2173,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     });
 
     renderWeeks();
+    renderCharts();
     renderRolling();
     renderCorrelations(p);
     renderStorage();
@@ -2190,6 +2297,232 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+
+  // ----------------------------------------------------------------- charts --
+  // Hand-drawn inline SVG. No chart library: the whole app is one dependency-free
+  // file and a 200 KB library to draw three small charts would be a bad trade.
+  //
+  // Rules followed throughout, because charts lie easily:
+  //   - every axis label names a value the chart actually reaches
+  //   - colours come from the theme tokens, so both themes stay legible
+  //   - an empty or thin dataset says so instead of drawing a confident-looking
+  //     line through three points
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgEl(tag, attrs, text) {
+    var e = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function emptyNote(svg, w, h, msg) {
+    clear(svg);
+    svg.appendChild(svgEl("text", {
+      x: w / 2, y: h / 2, "text-anchor": "middle", fill: "var(--muted)",
+      "font-family": "IBM Plex Mono, monospace", "font-size": "13"
+    }, msg));
+  }
+  function niceTop(v, floor) {
+    var m = Math.max(v, floor || 1);
+    var step = Math.pow(10, Math.floor(Math.log(m) / Math.LN10)) / 2;
+    return Math.max(Math.ceil(m / step) * step, step);
+  }
+  function shortWeek(iso) { return iso.slice(5).replace("-", "/"); }
+
+  /* ---- 1. weekly bars + soreness overlay ---------------------------------- */
+  function drawWeekly(weeks) {
+    var svg = $("chWeekly"), W = 900, H = 300, L = 54, R = 46, T = 18, B = 44;
+    if (!weeks.length) {
+      emptyNote(svg, W, H, "Log a session to start the weekly chart");
+      return;
+    }
+    clear(svg);
+    var top = niceTop(Math.max.apply(null, weeks.map(function (w) {
+      return Math.max(w.aeL, w.ecc); })), 100);
+    var Y = function (v) { return H - B - (v / top) * (H - T - B); };
+    var Ys = function (v) { return H - B - (v / 10) * (H - T - B); };   // soreness 0-10
+    var iw = (W - L - R) / weeks.length;
+    var bw = Math.min(iw * 0.32, 30);
+
+    for (var k = 0; k <= 4; k++) {
+      var v = top * k / 4;
+      svg.appendChild(svgEl("line", { x1: L, y1: Y(v), x2: W - R, y2: Y(v),
+        stroke: "var(--line)", "stroke-width": 1 }));
+      svg.appendChild(svgEl("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(Math.round(v))));
+    }
+    // right axis for soreness
+    [0, 5, 10].forEach(function (v) {
+      svg.appendChild(svgEl("text", { x: W - R + 8, y: Ys(v) + 4, "text-anchor": "start",
+        fill: "var(--flag)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(v)));
+    });
+    if (top >= 100) {
+      svg.appendChild(svgEl("line", { x1: L, y1: Y(100), x2: W - R, y2: Y(100),
+        stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "3 4" }));
+    }
+
+    var pts = [];
+    weeks.forEach(function (w, i) {
+      var cx = L + iw * (i + 0.5);
+      svg.appendChild(svgEl("rect", { x: cx - bw - 2, y: Y(w.aeL), width: bw,
+        height: Math.max(Y(0) - Y(w.aeL), 0), fill: "var(--aero)", rx: 1 }));
+      svg.appendChild(svgEl("rect", { x: cx + 2, y: Y(w.ecc), width: bw,
+        height: Math.max(Y(0) - Y(w.ecc), 0), fill: "var(--mech)", rx: 1 }));
+      svg.appendChild(svgEl("text", { x: cx, y: Y(0) + 16, "text-anchor": "middle",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 10 }, shortWeek(w.week)));
+      if (w.meanSoreness != null) pts.push({ x: cx, y: Ys(w.meanSoreness), v: w.meanSoreness });
+    });
+
+    if (pts.length > 1) {
+      svg.appendChild(svgEl("polyline", {
+        points: pts.map(function (p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" "),
+        fill: "none", stroke: "var(--flag)", "stroke-width": 2.4,
+        "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    pts.forEach(function (p) {
+      svg.appendChild(svgEl("circle", { cx: p.x, cy: p.y, r: 3.6, fill: "var(--flag)" }));
+    });
+    if (!pts.length) {
+      svg.appendChild(svgEl("text", { x: W - R - 4, y: T + 12, "text-anchor": "end",
+        fill: "var(--flag)", "font-family": "IBM Plex Mono, monospace", "font-size": 11 },
+        "no soreness scored yet"));
+    }
+    svg.appendChild(svgEl("text", { x: L - 46, y: T + 8, fill: "var(--muted)",
+      "font-family": "IBM Plex Mono, monospace", "font-size": 11 }, "AU"));
+  }
+
+  /* ---- 2. divergence line over ramp bars ---------------------------------- */
+  function drawDivergence(weeks) {
+    var svg = $("chDiverge"), W = 900, H = 260, L = 54, R = 50, T = 18, B = 44;
+    var usable = weeks.filter(function (w) { return w.divergence != null; });
+    if (usable.length < 2) {
+      emptyNote(svg, W, H, "Two weeks of data will start this chart");
+      return;
+    }
+    clear(svg);
+    var maxD = niceTop(Math.max.apply(null, usable.map(function (w) { return w.divergence; })), 0.5);
+    var mid = H - B - (H - T - B) / 2;
+    var Y = function (v) { return H - B - (v / maxD) * (H - T - B); };
+    // ramp bars are centred on the midline, +/-100%
+    var Yr = function (pct) { return mid - Math.max(Math.min(pct, 1), -1) * ((H - T - B) / 2); };
+    var iw = (W - L - R) / weeks.length;
+
+    for (var k = 0; k <= 4; k++) {
+      var v = maxD * k / 4;
+      svg.appendChild(svgEl("line", { x1: L, y1: Y(v), x2: W - R, y2: Y(v),
+        stroke: "var(--line)", "stroke-width": 1 }));
+      svg.appendChild(svgEl("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, v.toFixed(2)));
+    }
+    [["+100%", 1], ["0", 0], ["−100%", -1]].forEach(function (t) {
+      svg.appendChild(svgEl("text", { x: W - R + 8, y: Yr(t[1]) + 4, "text-anchor": "start",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace", "font-size": 10 }, t[0]));
+    });
+
+    weeks.forEach(function (w, i) {
+      var cx = L + iw * (i + 0.5), bw = Math.min(iw * 0.5, 36);
+      if (w.eccDelta != null) {
+        var y = Yr(w.eccDelta), h = Math.abs(y - mid);
+        svg.appendChild(svgEl("rect", {
+          x: cx - bw / 2, y: Math.min(y, mid), width: bw, height: Math.max(h, 1),
+          fill: "var(--mech-soft)", stroke: "var(--mech)", "stroke-width": 0.6, rx: 1 }));
+      }
+      svg.appendChild(svgEl("text", { x: cx, y: H - B + 16, "text-anchor": "middle",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 10 }, shortWeek(w.week)));
+    });
+    svg.appendChild(svgEl("line", { x1: L, y1: mid, x2: W - R, y2: mid,
+      stroke: "var(--line-2)", "stroke-width": 1, "stroke-dasharray": "2 3" }));
+
+    var line = weeks.filter(function (w) { return w.divergence != null; })
+      .map(function (w) {
+        var i = weeks.indexOf(w);
+        return (L + iw * (i + 0.5)).toFixed(1) + "," + Y(w.divergence).toFixed(1);
+      });
+    svg.appendChild(svgEl("polyline", { points: line.join(" "), fill: "none",
+      stroke: "var(--ink-2)", "stroke-width": 2.4, "stroke-linejoin": "round" }));
+    weeks.forEach(function (w, i) {
+      if (w.divergence == null) return;
+      svg.appendChild(svgEl("circle", { cx: L + iw * (i + 0.5), cy: Y(w.divergence),
+        r: 3.6, fill: "var(--ink-2)" }));
+    });
+  }
+
+  /* ---- 3. Ê vs soreness scatter ------------------------------------------- */
+  function drawScatter() {
+    var svg = $("chScatter"), W = 900, H = 320, L = 56, R = 20, T = 20, B = 48;
+    var pts = S.scatterPairs(doc, LM.evaluateSession, "eccentric", "soreness");
+    var stats = $("scatterStats");
+
+    if (!pts.length) {
+      emptyNote(svg, W, H, "Score next-day quad soreness on a session to start this chart");
+      stats.textContent = "0 scored sessions — soreness is entered the morning after, via edit";
+      return;
+    }
+    clear(svg);
+    var maxX = niceTop(Math.max.apply(null, pts.map(function (p) { return p.x; })), 50);
+    var X = function (v) { return L + (v / maxX) * (W - L - R); };
+    var Y = function (v) { return H - B - (v / 10) * (H - T - B); };
+
+    for (var y = 0; y <= 10; y += 2) {
+      svg.appendChild(svgEl("line", { x1: L, y1: Y(y), x2: W - R, y2: Y(y),
+        stroke: "var(--line)", "stroke-width": 1 }));
+      svg.appendChild(svgEl("text", { x: L - 8, y: Y(y) + 4, "text-anchor": "end",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(y)));
+    }
+    for (var k = 0; k <= 4; k++) {
+      var xv = maxX * k / 4;
+      svg.appendChild(svgEl("text", { x: X(xv), y: H - B + 18, "text-anchor": "middle",
+        fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+        "font-size": 11 }, String(Math.round(xv))));
+    }
+    svg.appendChild(svgEl("text", { x: (L + W - R) / 2, y: H - 8, "text-anchor": "middle",
+      fill: "var(--muted)", "font-family": "IBM Plex Mono, monospace",
+      "font-size": 11 }, "eccentric load Ê (AU)"));
+    svg.appendChild(svgEl("text", { x: L - 46, y: T + 8, fill: "var(--muted)",
+      "font-family": "IBM Plex Mono, monospace", "font-size": 11 }, "sore"));
+
+    var fit = S.linearFit(pts, 5);
+    if (fit) {
+      var x0 = 0, x1 = maxX;
+      var y0 = Math.max(Math.min(fit.intercept, 10), 0);
+      var y1 = Math.max(Math.min(fit.intercept + fit.slope * x1, 10), 0);
+      svg.appendChild(svgEl("line", { x1: X(x0), y1: Y(y0), x2: X(x1), y2: Y(y1),
+        stroke: "var(--mech)", "stroke-width": 2, "stroke-dasharray": "6 4" }));
+    }
+    pts.forEach(function (p) {
+      var c = svgEl("circle", { cx: X(p.x), cy: Y(p.y), r: 5,
+        fill: "var(--mech)", "fill-opacity": 0.65,
+        stroke: "var(--mech)", "stroke-width": 1 });
+      c.appendChild(svgEl("title", {}, p.date + " · " + p.label +
+        " · Ê " + Math.round(p.x) + " AU · soreness " + p.y));
+      svg.appendChild(c);
+    });
+
+    if (fit) {
+      var strength = Math.abs(fit.r) >= 0.7 ? "strong" : Math.abs(fit.r) >= 0.4 ? "moderate" : "weak";
+      stats.textContent = "r = " + fit.r.toFixed(2) + " (" + strength + "), n = " + fit.n +
+        (fit.n < 10 ? " — under 10 sessions this is indicative, not conclusive" : "");
+    } else {
+      stats.textContent = pts.length + " of 5 scored sessions — no line drawn yet, because a " +
+        "trend through this few points invites a conclusion the data cannot support";
+    }
+  }
+
+  function renderCharts() {
+    var weeks = S.weeklySeries(doc, LM.evaluateSession, 16);
+    drawWeekly(weeks);
+    drawDivergence(weeks);
+    drawScatter();
   }
 
   // ------------------------------------------------------- connection test --
