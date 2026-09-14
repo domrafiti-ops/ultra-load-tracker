@@ -210,23 +210,24 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   .unitpick button[aria-pressed="true"]{background:var(--surface); border:1px solid var(--line)}
   .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px}
   .dot.ok{background:var(--ok)} .dot.pend{background:var(--flag)} .dot.off{background:var(--line-2)}
-  /* ---- collapsible settings ---- */
-  details#settings{border:1px solid var(--line); border-radius:3px; background:var(--surface);
-    margin:22px 0 0}
-  details#settings > summary{list-style:none; cursor:pointer; padding:13px 16px;
+  /* ---- collapsible sections: settings, morning check-in, EOD check-out ---- */
+  details.collapsible{border:1px solid var(--line); border-radius:3px; background:var(--surface);
+    margin-top:48px}
+  details#settings{margin:22px 0 0}
+  details.collapsible > summary{list-style:none; cursor:pointer; padding:13px 16px;
     display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-height:44px;
     font-family:Archivo,sans-serif; -webkit-tap-highlight-color:transparent}
-  details#settings > summary::-webkit-details-marker{display:none}
-  details#settings > summary::after{content:"▸"; margin-left:auto; color:var(--muted);
+  details.collapsible > summary::-webkit-details-marker{display:none}
+  details.collapsible > summary::after{content:"▸"; margin-left:auto; color:var(--muted);
     font-size:13px; transition:transform .12s ease}
-  details#settings[open] > summary::after{transform:rotate(90deg)}
-  details#settings > summary:focus-visible{outline:2px solid var(--aero); outline-offset:-2px}
+  details.collapsible[open] > summary::after{transform:rotate(90deg)}
+  details.collapsible > summary:focus-visible{outline:2px solid var(--aero); outline-offset:-2px}
   .sumTitle{font-weight:600; font-size:14.5px}
   .sumHint{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted)}
-  details#settings > .panel{border:none; border-top:1px solid var(--line);
+  details.collapsible > .panel{border:none; border-top:1px solid var(--line);
     border-radius:0 0 3px 3px; background:transparent}
   @media (prefers-reduced-motion: reduce){
-    details#settings > summary::after{transition:none}
+    details.collapsible > summary::after{transition:none}
   }
 
   /* ---- day table ---- */
@@ -255,6 +256,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     h1{font-size:27px}
     .standfirst{font-size:15.5px}
     section{margin-top:32px}
+    details.collapsible{margin-top:32px}
     .panel{padding:14px}
     p{font-size:15.5px}
 
@@ -359,7 +361,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
 
 <!-- Native <details>: no JavaScript, works on iOS, and survives a scripting
      failure — a settings panel you cannot open is worse than one always shown. -->
-<details id="settings">
+<details id="settings" class="collapsible">
   <summary>
     <span class="sumTitle">Settings</span>
     <span class="sumHint" id="settingsHint">profile · units · bike</span>
@@ -399,8 +401,11 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   </div>
 </details>
 
-<section id="morning" style="margin-top:0">
-  <h2>Morning check-in</h2>
+<details id="morning" class="collapsible" open>
+  <summary>
+    <span class="sumTitle">Morning check-in</span>
+    <span class="sumHint" id="morningHint">HRV · resting HR · soreness · sleep</span>
+  </summary>
   <div class="panel">
     <div class="banner" id="mornBanner" hidden></div>
     <div class="gridauto">
@@ -423,7 +428,36 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <span class="savenote" id="mornNote"></span>
     </div>
   </div>
-</section>
+</details>
+
+<details id="checkout" class="collapsible" open>
+  <summary>
+    <span class="sumTitle">End-of-day check-out</span>
+    <span class="sumHint" id="checkoutHint">reserve · env impact · energy · notes</span>
+  </summary>
+  <div class="panel">
+    <p class="savenote" style="margin:0 0 14px">Not load. A separate end-of-day record — how much you had left, what the day outside training put on you, and anything worth remembering. Never touches AeL, Ê or B̂.</p>
+    <div class="banner" id="checkoutBanner" hidden></div>
+    <div class="gridauto">
+      <div class="f"><label for="coDate">Date</label>
+        <input id="coDate" type="date"></div>
+      <div class="f"><label for="coReserve">Remaining reserve <span class="sublab">0–10</span></label>
+        <input id="coReserve" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
+      <div class="f"><label for="coEnv">Outside environment impact <span class="sublab">0–10</span></label>
+        <input id="coEnv" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
+      <div class="f"><label for="coEnergy">Physical energy <span class="sublab">0–10</span></label>
+        <input id="coEnergy" type="number" inputmode="decimal" placeholder="—" step="0.5" min="0" max="10"></div>
+    </div>
+    <div class="f" style="margin-top:12px"><label for="coProud">Proud of <span class="sublab">240 char max</span></label>
+      <input id="coProud" type="text" class="serif" maxlength="240" placeholder="What went right today"></div>
+    <div class="f" style="margin-top:12px"><label for="coNotes">Anything else worth noting <span class="sublab">240 char max</span></label>
+      <input id="coNotes" type="text" class="serif" maxlength="240" placeholder="—"></div>
+    <div class="btnrow">
+      <button type="button" class="primary" id="saveCheckout">Save check-out</button>
+      <span class="savenote" id="checkoutNote"></span>
+    </div>
+  </div>
+</details>
 
 <section id="entry">
   <h2>Log a workout</h2>
@@ -493,6 +527,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <table class="log">
       <thead><tr>
         <th>Date</th><th>HRV</th><th>RHR</th><th>Sleep</th><th>Sore</th>
+        <th>Reserve</th><th>Env</th><th>Energy</th>
         <th>Workout</th><th>min</th><th>HR</th>
         <th id="thDist">km</th><th id="thUp">D+ m</th><th id="thDown">D− m</th>
         <th>AeL</th><th>Ê</th><th>B̂</th><th></th>
@@ -1281,11 +1316,21 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     date: "d", hrv: "v", restingHr: "rh", soreness: "s",
     sleepScore: "sq", sleepNotes: "sn", editedAt: "e", deletedAt: "x"
   };
+  // One EOD check-out per date, same reasoning as the morning check-in. Not
+  // load data — deliberately outside evaluateSession and never touches the
+  // mod-load-model block. reserve/envImpact/energy are 0-10 scales, same
+  // validation shape as morning's soreness/sleepScore. proudOf/notes are free
+  // text capped at 240 chars in validateCheckout.
+  var CHECKOUT_MAP = {
+    date: "d", reserve: "rv", envImpact: "ei", energy: "en",
+    proudOf: "pf", notes: "nt", editedAt: "e", deletedAt: "x"
+  };
   var TIME_FIELDS = ["editedAt", "deletedAt"];
 
   var SESSION_FIELDS = Object.keys(SESSION_MAP);
   var PROFILE_FIELDS = Object.keys(PROFILE_MAP);
   var MORNING_FIELDS = Object.keys(MORNING_MAP);
+  var CHECKOUT_FIELDS = Object.keys(CHECKOUT_MAP);
 
   var DEFAULT_PROFILE = {
     massKg: 70, male: true, hrMax: 188, hrRest: 46,
@@ -1302,13 +1347,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   var SESSION_UNMAP = invert(SESSION_MAP);
   var PROFILE_UNMAP = invert(PROFILE_MAP);
   var MORNING_UNMAP = invert(MORNING_MAP);
+  var CHECKOUT_UNMAP = invert(CHECKOUT_MAP);
 
   // ---------------------------------------------------------------- schema ---
 
   function now() { return Math.floor(Date.now() / 1000); }
   function emptyDoc() {
     return { schema: SCHEMA, rev: 0, updatedAt: now(),
-             profile: {}, sessions: [], mornings: [] };
+             profile: {}, sessions: [], mornings: [], checkouts: [] };
   }
   function keep(v) { return v !== undefined && v !== null && v !== ""; }
 
@@ -1338,7 +1384,11 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       // why this tolerates a missing array rather than assuming one.
       mornings: (Array.isArray(d.mornings) ? d.mornings : [])
         .map(function (m) { return readFields(m, MORNING_FIELDS, MORNING_UNMAP); })
-        .filter(function (m) { return !!m.date; })
+        .filter(function (m) { return !!m.date; }),
+      // Same tolerance for logs written before the EOD check-out existed.
+      checkouts: (Array.isArray(d.checkouts) ? d.checkouts : [])
+        .map(function (c) { return readFields(c, CHECKOUT_FIELDS, CHECKOUT_UNMAP); })
+        .filter(function (c) { return !!c.date; })
     };
   }
 
@@ -1376,7 +1426,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       v: SCHEMA, rev: d.rev, ts: d.updatedAt,
       profile: mapKeys(d.profile, PROFILE_MAP),
       sessions: d.sessions.map(function (s) { return mapKeys(s, SESSION_MAP); }),
-      mornings: d.mornings.map(function (m) { return mapKeys(m, MORNING_MAP); })
+      mornings: d.mornings.map(function (m) { return mapKeys(m, MORNING_MAP); }),
+      checkouts: d.checkouts.map(function (c) { return mapKeys(c, CHECKOUT_MAP); })
     };
   }
   function mapKeys(obj, map) {
@@ -1389,7 +1440,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     return normalise({
       rev: w.rev,
       updatedAt: w.ts !== undefined ? w.ts : w.updatedAt,
-      profile: w.profile, sessions: w.sessions, mornings: w.mornings
+      profile: w.profile, sessions: w.sessions, mornings: w.mornings,
+      checkouts: w.checkouts
     });
   }
 
@@ -1415,6 +1467,37 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     d.mornings.forEach(function (m, i) { if (m.date === morning.date) idx = i; });
     morning.editedAt = now();
     if (idx >= 0) d.mornings[idx] = morning; else d.mornings.push(morning);
+    d.rev += 1;
+    d.updatedAt = now();
+    return d;
+  }
+
+  // ------------------------------------------------------------ checkouts ---
+  // Not load data. Deliberately parallel to mornings above rather than folded
+  // into them — a checkout is an evening record, a morning is a morning one,
+  // and keeping them as two independent per-day maps means editing one never
+  // touches the other's editedAt/merge outcome.
+
+  function liveCheckouts(doc) {
+    return (doc.checkouts || [])
+      .filter(function (c) { return !c.deletedAt; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  }
+  function checkoutFor(doc, date) {
+    var found = null;
+    (doc.checkouts || []).forEach(function (c) {
+      if (c.date === date && !c.deletedAt) found = c;
+    });
+    return found;
+  }
+  /** Insert or replace the check-out for a date. Returns the mutated doc. */
+  function upsertCheckout(doc, checkout) {
+    var d = doc;
+    if (!Array.isArray(d.checkouts)) d.checkouts = [];
+    var idx = -1;
+    d.checkouts.forEach(function (c, i) { if (c.date === checkout.date) idx = i; });
+    checkout.editedAt = now();
+    if (idx >= 0) d.checkouts[idx] = checkout; else d.checkouts.push(checkout);
     d.rev += 1;
     d.updatedAt = now();
     return d;
@@ -1449,12 +1532,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     var d = normalise(doc), p = profileOf(d), byDate = {};
     function slot(date) {
       if (!byDate[date]) {
-        byDate[date] = { date: date, morning: null, sessions: [],
+        byDate[date] = { date: date, morning: null, checkout: null, sessions: [],
                          aeL: 0, ecc: null, cyc: null, hasRun: false, hasBike: false };
       }
       return byDate[date];
     }
     liveMornings(d).forEach(function (m) { slot(m.date).morning = m; });
+    liveCheckouts(d).forEach(function (c) { slot(c.date).checkout = c; });
     liveSessions(d).forEach(function (s) {
       var row = slot(s.date), r = evaluate ? evaluate(s, p) : {};
       row.sessions.push({ session: s, result: r });
@@ -1576,6 +1660,20 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     absorbM(A.mornings);
     absorbM(B.mornings);
 
+    // Checkouts merge the same way — one per day, keyed on date. A separate
+    // map from mornings' byDate, even though both key on the same date
+    // strings, because they are two independent per-day records.
+    var byDateCO = {};
+    function absorbCO(list) {
+      list.forEach(function (c) {
+        var prev = byDateCO[c.date];
+        if (!prev) { byDateCO[c.date] = c; return; }
+        if ((c.editedAt || 0) > (prev.editedAt || 0)) byDateCO[c.date] = c;
+      });
+    }
+    absorbCO(A.checkouts);
+    absorbCO(B.checkouts);
+
     var winner = B.rev > A.rev ? B : A;
     return {
       schema: SCHEMA,
@@ -1584,7 +1682,8 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       profile: Object.keys(winner.profile).length ? winner.profile
              : (Object.keys(A.profile).length ? A.profile : B.profile),
       sessions: Object.keys(byId).map(function (k) { return byId[k]; }),
-      mornings: Object.keys(byDate).map(function (k) { return byDate[k]; })
+      mornings: Object.keys(byDate).map(function (k) { return byDate[k]; }),
+      checkouts: Object.keys(byDateCO).map(function (k) { return byDateCO[k]; })
     };
   }
 
@@ -1665,6 +1764,31 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       return toNum(m[k]) != null;
     }) || (m.sleepNotes && String(m.sleepNotes).trim());
     if (!any) errs.push("Fill in at least one field before saving the check-in.");
+    return errs;
+  }
+
+  /** Mirrors the ranges the EOD check-out form accepts. */
+  function validateCheckout(c) {
+    var errs = [];
+    if (!c.date) errs.push("Date is required.");
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(c.date)) errs.push("Date must be YYYY-MM-DD.");
+    [["reserve", 10, "Remaining reserve"], ["envImpact", 10, "Outside environment impact"],
+     ["energy", 10, "Physical energy"]].forEach(function (x) {
+      var v = toNum(c[x[0]]);
+      if (v != null && (v < 0 || v > x[1])) {
+        errs.push(x[2] + " is out of range (0–" + x[1] + ").");
+      }
+    });
+    [["proudOf", "Proud of"], ["notes", "The notes field"]].forEach(function (x) {
+      var v = c[x[0]];
+      if (v != null && String(v).length > 240) {
+        errs.push(x[1] + " must be 240 characters or fewer.");
+      }
+    });
+    var any = ["reserve", "envImpact", "energy"].some(function (k) {
+      return toNum(c[k]) != null;
+    }) || (c.proudOf && String(c.proudOf).trim()) || (c.notes && String(c.notes).trim());
+    if (!any) errs.push("Fill in at least one field before saving the check-out.");
     return errs;
   }
 
@@ -2271,9 +2395,11 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     liveSessions: liveSessions, mergeDocs: mergeDocs,
     MORNING_MAP: MORNING_MAP,
     liveMornings: liveMornings, morningFor: morningFor, upsertMorning: upsertMorning,
+    CHECKOUT_MAP: CHECKOUT_MAP,
+    liveCheckouts: liveCheckouts, checkoutFor: checkoutFor, upsertCheckout: upsertCheckout,
     sorenessOn: sorenessOn, addDays: addDays, dayRows: dayRows,
     sorenessLagPairs: sorenessLagPairs, readinessSeries: readinessSeries,
-    validateMorning: validateMorning,
+    validateMorning: validateMorning, validateCheckout: validateCheckout,
     serialise: serialise, sizeInfo: sizeInfo, byteLength: byteLength,
     archiveBefore: archiveBefore,
     validateSession: validateSession, warnSession: warnSession,
@@ -2621,6 +2747,61 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     if (autoSync) pushRemote("check-in");
   }
 
+  // --------------------------------------------------------------- checkout --
+  // Parallel to the morning functions above. Not load — reserve/envImpact/
+  // energy never reach evaluateSession, and proudOf/notes are free text only.
+
+  function readCheckout() {
+    return {
+      date: $("coDate").value || new Date().toISOString().slice(0, 10),
+      reserve: rawOpt("coReserve"),
+      envImpact: rawOpt("coEnv"),
+      energy: rawOpt("coEnergy"),
+      proudOf: ($("coProud").value || "").trim(),
+      notes: ($("coNotes").value || "").trim()
+    };
+  }
+  function writeCheckout(c) {
+    $("coDate").value = (c && c.date) || new Date().toISOString().slice(0, 10);
+    $("coReserve").value = c && c.reserve != null ? c.reserve : "";
+    $("coEnv").value = c && c.envImpact != null ? c.envImpact : "";
+    $("coEnergy").value = c && c.energy != null ? c.energy : "";
+    $("coProud").value = (c && c.proudOf) || "";
+    $("coNotes").value = (c && c.notes) || "";
+  }
+  /** Load whatever is already stored for the date in the form. */
+  function syncCheckoutForm() {
+    var d = $("coDate").value;
+    var existing = d ? S.checkoutFor(doc, d) : null;
+    $("checkoutBanner").hidden = !existing;
+    if (existing) {
+      $("checkoutBanner").textContent =
+        "A check-out already exists for " + d + " — saving will replace it.";
+    }
+  }
+  function saveCheckout() {
+    var c = readCheckout();
+    var errs = S.validateCheckout(c);
+    if (errs.length) { say("checkoutNote", errs[0], "bad"); return; }
+    doc = S.upsertCheckout(doc, c);
+    dirty = true;
+    persist();
+    render();
+    say("checkoutNote", "Check-out saved for " + c.date + ".", "ok");
+    syncCheckoutForm();
+    if (autoSync) pushRemote("check-out");
+  }
+  /** Jump to the checkout form with that date's entry loaded. */
+  function editCheckout(date) {
+    var c = S.checkoutFor(doc, date);
+    writeCheckout(c || { date: date });
+    syncCheckoutForm();
+    say("checkoutNote", c ? "Editing the check-out for " + date + "."
+                          : "New check-out for " + date + ".", "");
+    $("checkout").open = true;
+    $("checkout").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function readSession() {
     return {
       id: editingId || S.newId(),
@@ -2870,7 +3051,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     }
 
     days.forEach(function (day) {
-      var m = day.morning;
+      var m = day.morning, co = day.checkout;
       var rowsForDay = day.sessions.length ? day.sessions : [null];
       rowsForDay.forEach(function (entry, i) {
         var s = entry && entry.session, r = entry && entry.result;
@@ -2882,13 +3063,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
             "<td" + span + ">" + num(m && m.hrv) + "</td>" +
             "<td" + span + ">" + num(m && m.restingHr) + "</td>" +
             "<td" + span + ">" + num(m && m.sleepScore, 1) + "</td>" +
-            "<td" + span + ">" + num(m && m.soreness, 1) + "</td>"
+            "<td" + span + ">" + num(m && m.soreness, 1) + "</td>" +
+            "<td" + span + ">" + num(co && co.reserve, 1) + "</td>" +
+            "<td" + span + ">" + num(co && co.envImpact, 1) + "</td>" +
+            "<td" + span + ">" + num(co && co.energy, 1) + "</td>"
           : "";
         if (!s) {
           tr.innerHTML = head +
             '<td class="lbl" colspan="10"><span class="muted">rest day</span>' +
             (m && m.sleepNotes ? " — " + esc(m.sleepNotes) : "") +
-            ' <button type="button" class="del em" data-date="' + esc(day.date) + '">edit</button></td>';
+            (co && co.proudOf ? " · proud of: " + esc(co.proudOf) : "") +
+            (co && co.notes ? " · " + esc(co.notes) : "") +
+            ' <button type="button" class="del em" data-date="' + esc(day.date) + '">am</button>' +
+            ' <button type="button" class="del pm" data-date="' + esc(day.date) + '">pm</button></td>';
           tb.appendChild(tr);
           return;
         }
@@ -2908,6 +3095,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
           '<td class="acts">' +
             '<button type="button" class="del ed" data-id="' + esc(s.id) + '">edit</button>' +
             '<button type="button" class="del em" data-date="' + esc(day.date) + '">am</button>' +
+            '<button type="button" class="del pm" data-date="' + esc(day.date) + '">pm</button>' +
             '<button type="button" class="del rm" data-id="' + esc(s.id) + '" ' +
               'aria-label="Delete workout">×</button></td>';
         tb.appendChild(tr);
@@ -2921,6 +3109,9 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     });
     tb.querySelectorAll("button.em").forEach(function (b) {
       b.addEventListener("click", function () { editMorning(b.getAttribute("data-date")); });
+    });
+    tb.querySelectorAll("button.pm").forEach(function (b) {
+      b.addEventListener("click", function () { editCheckout(b.getAttribute("data-date")); });
     });
 
     // Charts are the most elaborate thing here and the least essential. A
@@ -3067,6 +3258,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     syncMorningForm();
     say("mornNote", m ? "Editing the check-in for " + date + "."
                       : "New check-in for " + date + ".", "");
+    $("morning").open = true;
     $("morning").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -3621,6 +3813,12 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       if (today) writeMorning(today);
       syncMorningForm();
     });
+    step("checkout form", function () {
+      $("coDate").value = new Date().toISOString().slice(0, 10);
+      var today = S.checkoutFor(doc, $("coDate").value);
+      if (today) writeCheckout(today);
+      syncCheckoutForm();
+    });
     step("sport", function () { setSport("run"); });
     step("auto-sync", function () { setAutoSync(initialAutoSync, { silent: true }); });
     step("readouts", refreshLive);
@@ -3645,6 +3843,13 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       var m = S.morningFor(doc, $("mDate").value);
       if (m) writeMorning(m);
       syncMorningForm();
+    });
+
+    $("saveCheckout").addEventListener("click", saveCheckout);
+    $("coDate").addEventListener("change", function () {
+      var c = S.checkoutFor(doc, $("coDate").value);
+      if (c) writeCheckout(c);
+      syncCheckoutForm();
     });
 
     $("save").addEventListener("click", commitSession);
