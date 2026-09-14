@@ -91,6 +91,11 @@ input.serif{font-family:"Source Serif 4",Georgia,serif}
 .gridauto{display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:12px}
 .corefields{display:grid; grid-template-columns:1.5fr repeat(5,1fr); gap:12px}
 @media(max-width:880px){.corefields{grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}}
+/* Duration as one grid cell holding three narrow h/m/s boxes, not three cells —
+   keeps the six-column corefields grid intact. */
+.hms{display:flex; align-items:center; gap:3px}
+.hms input{padding:7px 3px; text-align:center; min-width:0}
+.hms .sep{color:var(--muted); font-size:13px}
 .subsection{margin-top:16px; padding-top:15px; border-top:1px dashed var(--line-2)}
 .subsection .hdr{display:flex; align-items:baseline; gap:10px; margin-bottom:11px; flex-wrap:wrap}
 .subsection .hdr .disp{font-size:14px; font-weight:600}
@@ -471,7 +476,14 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     <p class="savenote" id="sportNote" hidden style="margin:8px 0 0">Ascent and descent are recorded but do <b>not</b> feed the model: climbing is already priced through heart rate, and descending is coasting. Ê and B̂ read <b>n/a</b>, not zero.</p>
     <div class="corefields" style="margin-top:14px">
       <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
-      <div class="f"><label for="dur">Duration <span class="sublab">min</span></label><input id="dur" type="number" inputmode="numeric" value="120" step="1" min="1"></div>
+      <div class="f"><label for="durH">Duration <span class="sublab">h : m : s</span></label>
+        <div class="hms">
+          <input id="durH" type="number" inputmode="numeric" value="2" step="1" min="0" aria-label="Hours">
+          <span class="sep">:</span>
+          <input id="durM" type="number" inputmode="numeric" value="0" step="1" min="0" max="59" aria-label="Minutes">
+          <span class="sep">:</span>
+          <input id="durS" type="number" inputmode="numeric" value="0" step="1" min="0" max="59" aria-label="Seconds">
+        </div></div>
       <div class="f"><label for="hr">Avg HR <span class="sublab">bpm</span></label><input id="hr" type="number" inputmode="numeric" value="145" step="1" min="1"></div>
       <div class="f"><label for="dist">Distance <span class="sublab" id="uDist">km</span></label><input id="dist" type="number" inputmode="decimal" value="16" step="0.1" min="0"></div>
       <div class="f" id="fUp"><label for="up">Ascent <span class="sublab" id="uUp">m</span></label><input id="up" type="number" inputmode="numeric" value="900" step="10" min="0"></div>
@@ -528,7 +540,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
       <thead><tr>
         <th>Date</th><th>HRV</th><th>RHR</th><th>Sleep</th><th>Sore</th>
         <th>Reserve</th><th>Env</th><th>Energy</th>
-        <th>Workout</th><th>min</th><th>HR</th>
+        <th>Workout</th><th>h:m:s</th><th>HR</th>
         <th id="thDist">km</th><th id="thUp">D+ m</th><th id="thDown">D− m</th>
         <th>AeL</th><th>Ê</th><th>B̂</th><th></th>
       </tr></thead>
@@ -2802,12 +2814,28 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     $("checkout").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /**
+   * Duration is typed as hours/minutes/seconds — easier to enter a 3:47:12
+   * day than to mental-math it into 227.2 minutes — but stored and modeled
+   * as the single decimal-minute value it always was. Nothing downstream of
+   * durationMin (validation, CSV, the model) changes.
+   */
+  function readDuration() {
+    return rawNum("durH") * 60 + rawNum("durM") + rawNum("durS") / 60;
+  }
+  function writeDuration(totalMin) {
+    var totalSec = Math.round(Math.max(0, totalMin || 0) * 60);
+    $("durH").value = Math.floor(totalSec / 3600);
+    $("durM").value = Math.floor((totalSec % 3600) / 60);
+    $("durS").value = totalSec % 60;
+  }
+
   function readSession() {
     return {
       id: editingId || S.newId(),
       date: $("date").value || new Date().toISOString().slice(0, 10),
       label: ($("label").value || "").trim() || "Session",
-      durationMin: rawNum("dur"),
+      durationMin: readDuration(),
       avgHr: rawNum("hr"),
       distanceKm: mNum("dist", "distance"),
       ascentM: mNum("up", "elevation"),
@@ -2829,7 +2857,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
   function writeSession(s) {
     $("date").value = s.date || "";
     $("label").value = s.label || "";
-    $("dur").value = s.durationMin || "";
+    writeDuration(s.durationMin);
     $("hr").value = s.avgHr || "";
     setField("dist", s.distanceKm, "distance");
     setField("up", s.ascentM, "elevation");
@@ -3049,6 +3077,19 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
     function num(v, dp) {
       return v == null ? "—" : (dp ? v.toFixed(dp) : String(Math.round(v)));
     }
+    /** Minutes -> "h:mm:ss", or "m:ss" under an hour — same convention as a
+        stopwatch, and far more scannable than a bare minute count once a
+        day's runs start running long. */
+    function fmtHms(totalMin) {
+      if (totalMin == null) return "—";
+      var totalSec = Math.round(totalMin * 60);
+      var h = Math.floor(totalSec / 3600);
+      var m = Math.floor((totalSec % 3600) / 60);
+      var s = totalSec % 60;
+      var mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+      var ss = String(s).padStart(2, "0");
+      return (h > 0 ? h + ":" : "") + mm + ":" + ss;
+    }
 
     days.forEach(function (day) {
       var m = day.morning, co = day.checkout;
@@ -3084,7 +3125,7 @@ footer{margin-top:64px; padding-top:18px; border-top:1px solid var(--line); font
         tr.innerHTML = head +
           '<td class="lbl"><span class="sportTag ' + (isBike ? "bike" : "run") + '">' +
             (isBike ? "bike" : "run") + "</span> " + esc(s.label) + "</td>" +
-          "<td>" + Math.round(s.durationMin) + "</td>" +
+          "<td>" + fmtHms(s.durationMin) + "</td>" +
           "<td>" + Math.round(s.avgHr) + "</td>" +
           "<td>" + U.toDisplay(s.distanceKm || 0, "distance", units).toFixed(dd) + "</td>" +
           "<td>" + Math.round(U.toDisplay(s.ascentM || 0, "elevation", units)) + "</td>" +
